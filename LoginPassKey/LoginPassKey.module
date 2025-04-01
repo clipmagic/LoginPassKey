@@ -1,0 +1,742 @@
+<?php
+namespace ProcessWire;
+
+/**
+ * WebAuthn for ProcessWire Frontend Users
+ *
+ * Copyright:
+ *
+ * Clip Magic - Prue Rowland
+ * Web: www.clipmagic.com.au
+ * Email: admin@clipmagic.com.au
+ *
+ *
+ * For use with:
+ * ProcessWire 3.x
+ * Copyright (C) 2014 by Ryan Cramer
+ * Licensed under GNU/GPL v2, see LICENSE.TXT
+ *
+ *
+ */
+
+class LoginPassKey extends WireData implements Module, ConfigurableModule
+{
+    public $transports = ['hybrid', 'internal'];
+
+    public $attestationFormat = 'none';
+
+    public $userVerification = 'preferred';
+
+    public $residentKey = 'preferred';
+
+    public $userDisplayName = null;
+
+    public $crossPlatformAttachment = null;
+
+    static public function getModuleInfo()
+    {
+        return [
+            'title' => 'Login with a PassKey for ProcessWire',
+            'author' => 'Clip magic',
+            'version' => '0.0.1',
+            'summary' => 'ProcessWire module that enables login via a passkey',
+            'autoload' => "template!=admin",
+    //        'singular' => true,
+            'requires' => ["PHP>=8.1", "ProcessWire>=3.0"]
+        ];
+    }
+
+    public function getModuleConfigInputfields(array $data)
+    {
+        $modules = wire('modules');
+        $sanitizer = wire('sanitizer');
+
+        $fields = new InputfieldWrapper();
+
+        // Authentication options
+        $fieldset = $modules->get('InputfieldFieldset');
+        $fieldset->attr('name+id', 'activate');
+        $fieldset->label = $this->_('Activate Module');
+
+        // Enable module load in Frontend
+        $field = $modules->get('InputfieldCheckbox');
+        $field->name = 'enabled';
+        $field->value = null;
+        $field->label = $this->_("Enable Frontend Passkey login");
+        if (isset($data['enabled']) && $data['enabled'] !== '') {
+            $field->value = $data['enabled'];
+            $field->attr('checked', 'checked');
+        }
+        $fieldset->add($field);
+        $fields->add($fieldset);
+
+        // Authentication options
+        $fieldset = $modules->get('InputfieldFieldset');
+        $fieldset->attr('name+id', 'authoptions');
+        $fieldset->label = $this->_('Authentication options');
+
+        // Application name
+        $field = $modules->get('InputfieldText');
+        $field->name = 'appname';
+        $field->label = $this->_("Application name");
+        $field->columnWidth	= 50;
+        $field->notes($this->_("Friendly application name")); ;
+        if(!empty($data['appname']))  $field->attr('value', $this->wire()->sanitizer->text($data['appname']));
+        $fieldset->add($field);
+
+        // Replying party host
+        $field = $modules->get('InputfieldText');
+        $field->name = 'rp';
+        $field->label = $this->_("Host name");
+        $field->columnWidth	= 50;
+        $field->notes($this->_("Leave blank to default to config->host")) ;
+        $field->value = !empty($data['rp']) ? $sanitizer->text($data['rp']) : $this->wire('config')->httpHost;
+        $fieldset->add($field);
+        $fields->add($fieldset);
+
+
+        // ProcessWire User settings
+        $fieldset = $modules->get('InputfieldFieldset');
+        $fieldset->attr('name+id', 'pwuserinfo');
+        $fieldset->label = $this->_('ProcessWire User Info');
+
+        // PW User template
+        $field = $modules->get('InputfieldRadios');
+        $field->name = 'user_template';
+        $field->label = $this->_("User template");
+        $field->columnWidth	= 33;
+        $field->required = 1;
+        $config = $this->wire('config');
+        $tpls = wire('templates');
+        foreach ($config->userTemplateIDs as $templateID) {
+            $tpl = $tpls->get($templateID);
+            $attrs = $tpl->id === $config->userTemplateID ? ["checked" => "checked"] : []; // default User template id
+            $field->addOption($templateID, $tpl->get("label|name"), $attrs);
+        }
+        if (!empty($data['user_template'])) $field->attr('value', $data['user_template']);
+        $fieldset->add($field);
+
+        // ProcessWire email field from selected template
+        $field = $modules->get('InputfieldRadios');
+        $field->name = 'user_fld';
+        $field->label = $this->_("Identify User by username or email field");
+        $field->columnWidth	= 33;
+        $field->notes = $this->_("After saving, a list of eligible email fields will be added");
+
+        $field->required = 1;
+        $field->addOption('name', 'Username', ['selected' => 'selected']);
+        if(!empty($data['user_template'])) {
+            $tpl = $tpls->get($data['user_template']);
+            foreach ($tpl->fieldgroup->fields->findByType("FieldtypeEmail") as $tplField) {
+                $field->addOption($tplField->name, $tplField->get("label|name"));
+            }
+        }
+        if (!empty($data['user_fld'])) $field->attr('value', $data['user_fld']);
+        $fieldset->add($field);
+
+        // Allowed roles
+        $field = $modules->get('InputfieldCheckboxes');
+        $field->name = 'roles';
+        $field->label = $this->_("User roles permitted to use WebAuthn");
+        $field->required = 1;
+        $field->columnWidth	= 34;
+        $roles = $this->wire('roles')->find('limit=200');
+        $config = $this->wire('config');
+        if ($roles->count > 0) {
+            foreach ($roles as $role) {
+                if($role->id === $config->guestUserRolePageID) continue;
+                $field->addOption($role->id, $role->name);
+            }
+        }
+        if (!empty($data['roles'])) $field->attr('value', $data['roles']);
+        $fieldset->add($field);
+
+        // API endpoint - registration
+        $field = $modules->get('InputfieldText');
+        $field->name = 'api_url';
+        $field->columnWidth	= 50;
+        $field->label = $this->_("Path to your API ENDPOINT");
+        $field->value = "/path/to/your/api/registration/endpoint/";
+        if(!empty($data['api_url']))
+            $field->value = $data['api_url'];
+        $field->required = 1;
+        $fieldset->add($field);
+       $fields->add($fieldset);
+        return $fields;
+    }
+
+    public function construct()
+    {
+        parent::__construct();
+    }
+
+    public function init ()
+    {
+        $this->addHook('Page::lpkFindUser', $this, 'lpkFindUser');
+        $this->addHook('Page::lpkGetArgs', $this, 'lpkGetArgs');
+        $this->addHook('Page::lpkPreRegisterUser', $this, 'lpkPreRegisterUser');
+        $this->addHook('Page::lpkRegisterUser', $this, 'lpkRegisterUser');
+        $this->addHook('Page::lpkGetApiUrl', $this, 'lpkGetApiUrl');
+        $this->addHook('Page::lpkGetApiHttpUrl', $this, 'lpkGetApiHttpUrl');
+        $this->addHook('Page::lpkGetWebAuthn', $this, 'lpkGetWebAuthn');
+        $this->addHook('Page::lpkVerify', $this, 'lpkVerify');
+        $this->addHook('Page::lpkGetUserByField', $this, 'lpkGetUserByField');
+        $this->addHook('Page::lpkVerifyResponse', $this, 'lpkVerifyResponse');
+        $this->addHook('Page::lpkGetErrorMessage', $this, 'lpkGetErrorMessage');
+
+        $this->addHookAfter('Page::render', $this, 'addScripts');
+    }
+
+    #---------------------
+    # Hooks
+    #---------------------
+
+    // Methods added to Page for use in templates
+    public function lpkFindUser(HookEvent $event) {
+        $user = $event->arguments(0);
+        $event->return = $this->findUser($user);
+    }
+
+    public function lpkGetApiUrl(HookEvent $event) {
+
+       $event->return = $this->api_url;
+    }
+
+    public function lpkGetApiHttpUrl(HookEvent $event) {
+        $event->return = 'https://' . $this->rp  .  $this->api_url;
+    }
+
+    public function lpkGetArgs(HookEvent $event) {
+        $event->return = $this->getlpkargs();
+    }
+    public function lpkPreRegisterUser(HookEvent $event) {
+        $user = $event->arguments(0);
+        $event->return = $this->preRegisterUser($user);
+    }
+
+    public function lpkGetUserByField(HookEvent $event) {
+        $username = $event->arguments(0);
+        $event->return = $this->_getUserByField($username);
+    }
+    public function lpkGetErrorMessage(HookEvent $event) {
+        $errormsg = $event->arguments(0);
+        $event->return = $this->getErrorMessage($errormsg);
+    }
+
+    public function lpkRegisterUser(HookEvent $event) {
+        $user = $event->arguments(0);
+        $dn = $event->arguments(1);
+        $event->return = $this->registerUser($user, $dn);
+    }
+
+    public function lpkVerify(HookEvent $event) {
+        $user = $event->arguments(0);
+        $event->return = $this->verifyUser($user);
+    }
+
+    public function lpkVerifyResponse(HookEvent $event) {
+        $authenticatorResponse = $event->arguments(0);
+        $event->return = $this->verifyResponse($authenticatorResponse);
+    }
+
+    // lpk only hooks
+    public function addScripts(HookEvent $event)
+    {
+        $return = $event->return;
+        // TODO modify config data to allow dev choice of javascripts and CSS
+        if(!$this->enabled) return;
+        if($this->page->template->name !== 'admin') {
+            $css = "<link rel='stylesheet' href='" . $this->config()->urls($this) . $this->className() . ".css'>";
+            $out = str_ireplace("</head>", $css . '</head>', $event->return);
+
+
+            $js = "<script src='" . $this->config()->urls($this) . $this->className() . ".js'></script>";
+            // horrible to put it in the head but iOS crap at honouring DOMContentLoaded
+            $return = str_ireplace("</head>", $js . '</head>', $out);
+        }
+        $event->return = $return;
+    }
+
+    public function getDatabase() {
+        return wire('database');
+    }
+
+    public function getTableName() : string{
+        return wire('sanitizer')->pageName($this->className());
+    }
+
+    public function showUser() {
+        return $this->user;
+    }
+
+    public function findUser(mixed $username = null) {
+
+        /*
+         * Scenarios
+         * 1. Username field empty xx
+         * 2. User is not logged in but device does support WebAuthn
+         * 3. User is not logged in, device supports WebAuthn but username not found xx
+         * 4. User is logged in but device does not support WebAuthn
+         * 5. User is logged, device does support WebAuthn but user does not WebAuthn challenge set
+         * 6. User roles do not match supported roles
+         * 7. User roles match supported roles, user is not logged in and has WebAuthn challenge set
+         * 8. User is loggedin and username does not match username input
+         * 9. User logged in with PassKey
+         */
+        $output = new \stdClass();
+
+        // Scenario 1
+        if(empty($username)) {
+            $output->fn = 'findUser';
+            $output->msg = $this->getErrorMessage(60);
+            $output->next = 'end';
+            return $output;
+        }
+
+        $users = wire('users');
+        $user = wire('user');
+        $feUser = $this->_getUserByField($username);
+
+        // Scenario 9 - put it early to make it quicker to execute
+        $loggedInWithPassKey = $this->wire('session')->getFor('lpk', 'success');
+        if(!$user->isGuest() && !!($loggedInWithPassKey)) {
+            bd($loggedInWithPassKey, 'lpk success');
+
+            // User used a passkey to login
+            $output->fn = 'findUser';
+            $output->msg = $this->_('Already logged in with PassKey');
+            $output->next = 'end';
+            $output->un = $username;
+            return $output;
+        }
+
+
+
+        // Scenario 3
+
+        if($feUser instanceof NullPage) {
+        //    $output->id = $feUser->id;
+            $output->msg = $this->getErrorMessage(65) . $username;
+            $output->fn = 'findUser';
+            $output->next = 'end';
+            return $output;
+        }
+
+
+
+        // Now to see if the FE User is allowed to use WebAuthn
+        $allowed = false;
+        foreach($feUser->roles() as $role) {
+            if (in_array($role->id, $this->roles))
+                $allowed = true;
+        }
+        if(!$allowed) {
+            $output->msg = $this->getErrorMessage(70);
+            $output->next = 'end';
+            return $output;
+        }
+
+
+        // Superuser must be checked to allow Superusers to use WebAuthn
+        // Superusers by default have all permissions
+        if($feUser->isSuperuser() && !empty($this->roles[0]) )
+            $allowed = true;
+
+        if (!$allowed) {
+            $output->un = $username;
+            $output->msg = $this->getErrorMessage(80);
+            $output->fn = 'finduser';
+            $output->next = 'end';
+            return $output;
+        }
+
+        // Checked loggedin user is trying to log in as someone else
+        if($feUser instanceof User && $user->isLoggedin() && $user->id !== $feUser->id) {
+            $output->un = $username;
+            $output->msg = $this->getErrorMessage(90);
+            $output->fn = 'finduser';
+            $output->next = 'end';
+            return $output;
+        }
+
+        // The user is legit and permitted to use WebAuthn
+        if($feUser->isGuest() ) {
+            $count = $this->_checklpkDB($feUser);
+            // if count 0, they need to login with their password to register
+            // otherwise, they have credentials in the DB which need to be verified
+            // they'll need to register a new passkey for each device
+
+            $action = $count > 0 ? "verify" : "register";
+            $output->un = $username;
+            if($count > 0 ) {
+                $output->verifyArgs = $this->_prepareToValidate($feUser);
+            }
+            $output->fn = 'finduser';
+            $output->next = $action;
+            return $output;
+        }
+
+        // Action to take for loggedin user if in/out of lpkDB
+//        $count = $this->_checklpkDB($feUser);
+
+//        $action = $count > 0 ? "end" : "register";
+
+//        $action = !empty($loggedInWithPassKey) ? "end" : "register";
+        $output->un = $username;
+        $output->fn = 'finduser';
+        $output->next = "register";
+        return $output;
+
+    }
+
+    private function _getUserByField($username)
+    {
+        if(!$username instanceof User) {
+            // it's the text-based name or email
+            $sanitizer = $this->wire('sanitizer');
+            $modConfigData = $this->wire('modules')->getConfig($this);
+            $fld = $modConfigData['user_fld'];
+            $username = $sanitizer->text($username);
+            $user = $this->wire('users')->get("name|$fld=$username");
+        }
+        return $user;
+    }
+
+    private function _checklpkDB($user) {
+        // OK they're a valid user
+        // Now let's see if they have existing credentials
+        try {
+            $count = false;
+            while (!$count) {
+                $db = wire('database');
+                $sql = "SELECT COUNT(user_id) from " . $this->getTableName() . " where user_id=" . $user->id;
+                $query = $db->prepare($sql);
+                $query->closeCursor();
+                $query->execute();
+                $result = $query->fetchAll(\PDO::FETCH_ASSOC);
+                return (int) $result[0]["COUNT(user_id)"];
+            }
+        } catch (WireException $e) {
+            return "Database Error: " . $e->getMessage();
+        }
+    }
+
+    private function _getCredentialsFromDB(User $user) {
+        try {
+            $db = wire('database');
+            $sql = "SELECT `credential_id` from " . $this->getTableName() . " where user_id=" . $user->id;
+            $query = $db->prepare($sql);
+            $query->closeCursor();
+            $query->execute();
+            $result = $query->fetchAll(\PDO::FETCH_ASSOC);
+            return $result;
+        } catch (WireException $e) {
+            return "Database Error: " . $e->getMessage();
+        }
+    }
+
+    private function _prepareToValidate($user)
+    {
+        $existingCredentials = $this->_getCredentialsFromDB($user);
+        $lpkArgs = $this->getlpkargs();
+
+        $args = new \stdClass();
+        $args->publicKey = new \stdClass();
+        $args->publicKey->timeout = 600000; // microseconds
+        $args->publicKey->challenge = $this->_createChallenge();  // binary
+        $args->publicKey->userVerification = $this->userVerification;
+        $args->publicKey->rpId = $lpkArgs->rp;
+
+        if (\is_array($existingCredentials) && \count($existingCredentials) > 0) {
+            $args->publicKey->allowCredentials = [];
+
+            foreach ($existingCredentials as $id) {
+                $tmp = new \stdClass();
+            //    $tmp->id = $id instanceof ByteBuffer ? $id : new ByteBuffer($id);  // binary
+                $tmp->id = $id;
+                $tmp->transports = $this->transports;
+                $tmp->type = 'public-key';
+                $args->publicKey->allowCredentials[] = $tmp;
+                unset ($tmp);
+             }
+        }
+        return $args;
+    }
+
+    private function _saveCredentialToDB($created) {
+        // User has to be logged in to get to this point
+        $user = $this->wire('user');
+        $db = wire('database');
+
+        $sql = <<<SQL
+            INSERT INTO {$this->getTableName()}
+            (
+             user_id, 
+             credential_id
+             ) 
+            VALUES 
+            ( 
+             :user_id,
+             :credential_id
+            )
+        SQL;
+
+        $query = $db->prepare($sql);
+        $query->bindParam(":user_id", $userId);
+        $query->bindParam(":credential_id", $credentialId);
+        $query->closeCursor();
+
+        // assign value to the bound params
+        $userId = $user->id;
+        $credentialId = $created->credentialId;
+        $output = $query->execute() ? true : false;
+        return $output;
+    }
+
+    public function preRegisterUser($user)
+    {
+        // valid, loggedin user and can use Passkeys. Need to register for this app
+
+        $lpkArgs = $this->getlpkargs();
+        $lpkArgs->crossPlatformAttachment = $this->crossPlatformAttachment;
+        $excludeRegistrations = $this->_getCredentialsFromDB($user);
+
+        $args = new \stdClass();
+        $args->publicKey = new \stdClass();
+
+        // relying party
+        $args->publicKey->rp = new \stdClass();
+        $args->publicKey->rp->name = $lpkArgs->appname;
+        $args->publicKey->rp->id = $lpkArgs->rp;
+
+        $args->publicKey->authenticatorSelection = new \stdClass();
+        $args->publicKey->authenticatorSelection->userVerification = $this->userVerification;
+
+        $args->publicKey->authenticatorSelection->residentKey = $this->residentKey;
+        $args->publicKey->authenticatorSelection->requireResidentKey = false;
+
+        $args->publicKey->authenticatorSelection->authenticatorAttachment = $this->crossPlatformAttachment;
+
+        // user
+        $args->publicKey->user = new \stdClass();
+        $args->publicKey->user->id = $user->id; // binary
+
+        // Get the username or email address based on the User object
+        $modConfigData = $this->wire('modules')->getConfig($this);
+        $fld = $modConfigData['user_fld'];
+        $username = $user->$fld;
+
+        $args->publicKey->user->name = $username;
+        $args->publicKey->user->displayName = '';
+
+        // supported algorithms
+        $args->publicKey->pubKeyCredParams = [];
+
+        $tmp = new \stdClass();
+        $tmp->type = 'public-key';
+        $tmp->alg = -8; // EdDSA
+        $args->publicKey->pubKeyCredParams[] = $tmp;
+        unset ($tmp);
+
+        $tmp = new \stdClass();
+        $tmp->type = 'public-key';
+        $tmp->alg = -7; // ES256
+        $args->publicKey->pubKeyCredParams[] = $tmp;
+        unset ($tmp);
+
+        $tmp = new \stdClass();
+        $tmp->type = 'public-key';
+        $tmp->alg = -257; // RS256
+        $args->publicKey->pubKeyCredParams[] = $tmp;
+        unset ($tmp);
+
+        // attestation
+        $args->publicKey->attestation = $this->attestationFormat;
+
+        $args->publicKey->extensions = new \stdClass();
+        $args->publicKey->extensions->exts = true;
+        $args->publicKey->timeout = 600000; // microseconds
+        $args->publicKey->challenge = $this->_createChallenge(); // binary
+
+        // save challenge to the session in case we need it later
+        //prevent re-registration by specifying existing credentials
+        $args->publicKey->excludeCredentials = [];
+
+        if (is_array($excludeRegistrations) && \count($excludeRegistrations) > 0) {
+            foreach ($excludeRegistrations as $id) {
+                $tmp = new \stdClass();
+                $tmp->id = $id['credential_id'];
+                $tmp->type = 'public-key';
+                $tmp->transports = $this->transports;
+                $args->publicKey->excludeCredentials[] = $tmp;
+                unset ($tmp);
+            }
+        }
+    return $args;
+    }
+
+    public function registerUser($user, $credData)
+    {
+        $clientDataJSON = $this->base64url_decode($credData->clientDataJSON);
+        $created = $this->processCreate($user, $clientDataJSON);
+    }
+
+    public function processCreate($user, $clientDataJSON)
+    {
+        $data = new \stdClass();
+
+        if(is_null($clientDataJSON) ) {
+            $data->error = 3;
+            $data->next = 'end';
+            return $data;
+        }
+
+        $clientData = \json_decode($clientDataJSON);
+
+        $toDB = new \stdClass();
+        $toDB->user_id = $user->id;
+        $toDB->credentialId = $clientData->challenge;
+
+        try {
+            $this->_saveCredentialToDB($toDB);
+            $data->created = true;
+            $data->msg = $this->_('Successfully registered.');
+        } catch(WireException $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            $data->created = false;
+            $data->error = $this->getErrorMessage(2);
+        }
+        return $data;
+    }
+
+    public function verifyUser($user) {
+
+        $lpkArgs = $this->getlpkargs();
+
+        $output = new \stdClass();
+        $output->publicKey = new \stdClass();
+        $output->publicKey->timeout = 420000000; // microseconds = 7mins
+        $output->publicKey->challenge = $this->_createChallenge();  // binary
+        $output->publicKey->userVerification = $this->userVerification;
+        $output->publicKey->rpId = $lpkArgs->rp;
+        return $output;
+    }
+
+    public function verifyResponse($authenticatorAttestationResponse = null)
+    {
+        $output = new \stdClass();
+        $output->fn = 'verify';
+
+        if(!empty($authenticatorAttestationResponse)) {
+            $output->msg = $this->_('Verified and logged in successfully');
+        }
+        $output->next = 'end';
+        return $output;
+    }
+
+    public function getlpkargs() {
+        $data = wire('modules')->getConfig($this);
+        unset($data['enabled']);
+        $data['attestation_format'] = $this->attestationFormat;
+        $data['crossPlatformAttachment'] = $this->crossPlatformAttachment;
+        $data['excludeRegistrations'] = [];
+
+        $output = new \stdClass();
+        foreach ($data as $key => $value) {
+            $output->$key = $value;
+        }
+        return $output;
+    }
+
+    private function _createChallenge()
+    {
+        $bytes = random_bytes(32);
+        return bin2hex($bytes);
+    }
+
+
+    #---------------------
+    # Utility functions
+    #---------------------
+
+    public function getErrorMessage(int $mgsNumber = 99) {
+        switch ($mgsNumber) {
+            case 1:
+                return $this->_('Sorry, your browser does not support this feature');
+            case 2:
+                return $this->_('Failed to create credentials');
+            case 3:
+                return $this->_("Failed to get authenticator attestation response");
+            case 4:
+                return $this->_('Failed to get credentials');
+            case 5:
+                return $this->_('Failed to get authenticator attestation response');
+            case 50:
+                return $this->_('User must login with password to register for passkey');
+            case 60:
+                return $this->_("No username provided");
+            case 65:
+                return $this->_("No user with name: ");
+            case 70:
+                return $this->_("User does not have permission to use WebAuthn");
+            case 80:
+                return $this->_("User has disallowed role");
+            case 90:
+                return $this->_("Loggedin user does not match submitted User");
+            case 99:
+            default:
+                return $this->_('Unknown error');
+        }
+
+    }
+
+    public function base64url_decode($data) {
+        return base64_decode(str_pad(strtr($data, '-_', '+/'), 4 - ((strlen($data) % 4) ?: 4), '=', STR_PAD_RIGHT));
+    }
+
+    #---------------------
+    # Install and Uninstall
+    #---------------------
+
+    public function ___install() {
+        $this->_createTable();
+    }
+
+    /**
+     * Remove the WA table
+     */
+    public function ___uninstall() {
+        $this->_deleteTable();
+    }
+
+    /**
+     * Create a table where we store user data.
+     */
+    protected function _createTable() {
+        $sql = "CREATE TABLE IF NOT EXISTS `" . $this->getTableName() . "` ( " .
+            "id INT(10) NOT NULL AUTO_INCREMENT, " .
+            "user_id INT(10) UNSIGNED NOT NULL, " .
+            "credential_id TEXT NOT NULL UNIQUE, " .
+            "created DATETIME DEFAULT CURRENT_TIMESTAMP, " .
+            "modified DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " .
+            "PRIMARY KEY (id), " .
+            "INDEX user_id_index (user_id), " .
+            "INDEX credential_id_index (user_id) " .
+            ")";
+
+
+        $db = $this->getDatabase();
+        return $db->exec($sql);
+    }
+
+    /**
+     * @return void
+     */
+    protected function _deleteTable()
+    {
+        $db = $this->getDatabase();
+        $sql = "DROP TABLE IF EXISTS " . $this->getTableName();
+        $db->exec($sql);
+    }
+
+}
