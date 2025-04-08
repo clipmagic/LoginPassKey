@@ -12,7 +12,7 @@ This module enables users to log in to ProcessWire with a WebAuthn passkey rathe
    * [How it works (Long version TLDR;)](#how-it-works-long-version-tldr)
    * [Installation ](#installation)
    * [Configuration](#configuration)
-      + [Activate Module](#activate-module)
+      + [Activate module](#activate-module)
       + [Authentication options](#authentication-options)
       + [ProcessWire user info](#processwire-user-info)
    * [Customising the frontend](#customising-the-frontend)
@@ -89,7 +89,7 @@ During the installation process, the module creates:
 ## Configuration
 The module configuration fields are:
 <a id="activate-module"></a>
-### Activate Module
+### Activate module
 - **Enable Frontend Passkey login** - check to allow frontend users to login with a passkey.
 - **Enable Admin Passkey login** - check to allow admins to login with a passkey
 <a id="authentication-options"></a>
