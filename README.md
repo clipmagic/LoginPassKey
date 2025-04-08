@@ -97,7 +97,7 @@ The module configuration fields are:
 ### Activate module
 - **Enable Frontend Passkey login** - check to allow frontend users to login with a passkey.
 - **Enable Admin Passkey login** - check to allow admins to login with a passkey.
-- 
+
 <a id="authentication-options"></a>
 ### Authentication options
 - **Application name** - the shortname that some passkey authenticators will display to enable users to differentiate between passkeys.
