@@ -88,6 +88,7 @@ During the installation process, the module creates:
   - disables appending of `_main.php`.
 - A publicly accessible page which is assigned the `lkp-api` template and is `hidden`.
 - It is then up to you to create a login page. See `examples/loginpasskey-page-tpl.php` for inspiration.
+
 <a id="configuration"></a>
 ## Configuration
 The module configuration fields are:
