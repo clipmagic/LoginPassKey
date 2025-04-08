@@ -18,6 +18,7 @@ This module enables users to log in to ProcessWire with a WebAuthn passkey rathe
    * [Customising the frontend](#customising-the-frontend)
    * [LoginPassKey in Admin](#loginpasskey-in-admin)
    * [Credit where it's due](#credit-where-its-due)
+   * [Like this module?](#like-this-module)
 
 <a id="passwords-vs-passkeys"></a>
 ## Passwords vs PassKeys
@@ -126,4 +127,8 @@ This module would not be possible without the help and support from:
    - Bernhard for his knowledge and who is always willing to help
    - All forum members who posted solutions to problems I faced creating this module
 
+<a id="like-this-module"></a>
+### Like this module?
+Please show your appreciation by sending Clip Magic some financial love via PayPal.
 
+<a href="https://www.paypal.com/donate/?hosted_button_id=FELNM24L4NM5N">Click to contribute to Clip Magic</a>
