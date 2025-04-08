@@ -88,7 +88,7 @@ During the installation process, the module creates:
   - disables appending of `_main.php`.
 - A publicly accessible page which is assigned the `lkp-api` template and is `hidden`.
 - It is then up to you to create a login page. See `examples/loginpasskey-page-tpl.php` for inspiration.
-- An admin page under `Access` to view/add/delete passkeys depending on user permissions. The list only shows `id`, `user id`, `username` and date `created`. It does not display any passkey authentication data.
+- An admin page under `Access` to view/add/delete passkeys depending on user permissions.
 
 <a id="configuration"></a>
 ## Configuration
@@ -123,7 +123,7 @@ The module configuration fields are:
 ## LoginPassKey in Admin
 When logged into the admin area, a user who is a superuser or has the `passkeys` permission, the page `PassKeys` appears as a child page of `Access`.
 
-Users with this permission can view and/or delete existing passkeys.
+Users with this permission can view and/or delete existing passkeys.  The list only shows `id`, `user id`, `username` and date `created`. It does not display any passkey authentication data.
 
 If `Enable Admin Passkey login` is checked, users with this permission can also add their own new passkeys.
 
