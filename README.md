@@ -128,7 +128,7 @@ This module would not be possible without the help and support from:
    - All forum members who posted solutions to problems I faced creating this module
 
 <a id="like-this-module"></a>
-### Like this module?
+## Like this module?
 Please show your appreciation by sending Clip Magic some financial love via PayPal.
 
 <a href="https://www.paypal.com/donate/?hosted_button_id=FELNM24L4NM5N">Click to contribute to Clip Magic</a>
