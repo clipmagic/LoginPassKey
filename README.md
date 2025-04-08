@@ -25,7 +25,6 @@ This module enables users to log in to ProcessWire with a WebAuthn passkey rathe
 **Passwords**:
 
 - Traditional security method using a combination of letters, numbers, and symbols.
-
 - Vulnerable to hacking, phishing, and weak practices like reuse.
 - Require users to remember and manage, which can lead to insecure behavior.
 - Can be used to log in across multiple, disparate devices
