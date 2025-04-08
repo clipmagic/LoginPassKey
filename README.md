@@ -10,7 +10,6 @@ This module enables users to log in to ProcessWire with a WebAuthn passkey rathe
    * [Features](#features)
    * [How it works (Short version)](#how-it-works-short-version)
    * [How it works (Long version TLDR;)](#how-it-works-long-version-tldr)
-   * [Installation](#installation)
    * [Configuration](#configuration)
       + [Activate Module](#activate-module)
       + [Authentication options](#authentication-options)
@@ -78,9 +77,6 @@ The match to these scenarios triggers one of three possible actions:
 1. Back out now
 2. Go through the passkey registration process
 3. Verify the passkey and log in the user
-
-<a id="install"></a>
-## Installation
 
 <a id="configuration"></a>
 ## Configuration
