@@ -1,0 +1,14 @@
+{
+  "name": "clipmagic/loginpasskey",
+  "description": "ProcessWire module enabling users to login with passkeys",
+  "minimum-stability": "stable",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Prue Rowland",
+      "email": "prue.rowland@gmail.com"
+    }
+  ],
+  "require": {
+  }
+}
