@@ -101,7 +101,7 @@ The module configuration fields are:
 
 **Frontend page template** - see `loginpasskey-page-tpl.php` in the `examples` folder. The script MUST be present but the layout can be whatever you choose. The id attribute of the button MUST match the `getElementById` selector.
 
-**LoginPassKey with LoginRegisterPro** - To do
+**LoginPassKey with LoginRegisterPro** - Coming soon
 
 **Api template** - see `loginpasskey-api-tpl.php` in the `examples` folder. **Changing this template will almost certainly break the application and is unsupported!**
 
