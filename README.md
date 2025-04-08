@@ -81,8 +81,8 @@ The match to these scenarios triggers one of three possible actions:
 <a id="installation"></a>
 ## Installation
 During the installation process, the module creates:
-- The Api template. The default name is `lkp-api` that includes attributes such:
-  - as one page only, 
+- The Api template. The default name is `lkp-api` that includes attributes such as:
+  - one page only, 
   - no children,
   - urlSegments `start`, `register`, `verify` and `end`, and
   - disables appending of `_main.php`.
