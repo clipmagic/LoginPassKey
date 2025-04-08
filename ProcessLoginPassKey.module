@@ -1,0 +1,233 @@
+<?php
+/*
+ * Copyright (c) 2025.
+ * Clip Magic - Prue Rowland
+ * Web: www.clipmagic.com.au
+ * Email: admin@clipmagic.com.au
+ *
+ * ProcessWire 3.x
+ * Copyright (C) 2014 by R
+ * Licensed under GNU/GPL
+ *
+ * https://processwire.com
+ */
+
+namespace ProcessWire;
+
+class ProcessLoginPassKey extends ProcessModule
+{
+
+    public $limit = 50;
+
+    public function __construct()
+    {
+        parent::__construct(); // remember to call the parent
+    }
+
+    public function init()
+    {
+        parent::init(); // always remember to call the parent init
+        $lpk = $this->wire('modules')->get('LoginPassKey');
+        $session = $this->wire('session');
+
+        if($lpk->enabledAdmin === 1) {
+            // Disable adding passkeys if Admin disabled in module config
+            $config = $this->wire('config');
+            $user = $this->wire('user');
+            $config->scripts->add($config->urls($this) . $lpk->className() . ".js");
+
+            // remove any existing session success to allow adding new passkeys
+            $session->removeFor('lpk', 'success');
+
+            $config->jsConfig('loginPassKey', [
+                'apiUrl' => 'https://' . $lpk->rp . $lpk->api_url,
+                'fn' => 'finduser',
+                'un' => $user->name,
+                'next' => 'register',
+            ]);
+        }
+    }
+
+    public function ___execute()
+    {
+        $modules = $this->wire()->modules;
+        $input = $this->wire('input');
+
+        $form = $modules->get('InputfieldForm');
+
+        /** @var MarkupAdminDataTable $table */
+        $table = $modules->get('MarkupAdminDataTable');
+        $table->setEncodeEntities(false);
+        $table->headerRow([
+            $this->_x('Id', 'th'),
+            $this->_x('User Id', 'th'),
+            $this->_x('Username', 'th'),
+            $this->_x('Created', 'th'),
+            wireIconMarkup('trash', 'lg')
+        ]);
+
+        /** @var InputfieldCheckbox $checkbox */
+        $checkbox = $modules->get('InputfieldCheckbox');
+        $checkbox->attr('name', 'deletes[]');
+        $checkbox->addClass('delete-checkbox');
+        $checkbox->checkboxOnly = true;
+        $checkbox->label = ' ';
+
+        /** @var InputfieldMarkup  */
+        $f = $modules->get('InputfieldMarkup');
+        $markup = "<h3>";
+        $markup .= $this->_("Please note:");
+        $markup .= "</h3>";
+        $markup .= "<p>";
+        $markup .= $this->_("Deleting passkeys from the database will NOT delete them from the device(s).");
+        $markup .= "</p>";
+        $f->set('value', $markup);
+
+        $pagination = $this->renderPagination();
+
+        $form->set('value', $f->value . $this->getPassKeys($table, $checkbox) . $pagination);
+
+
+        /** @var InputfieldButton $f */
+        $lpk = $this->wire('modules')->get('LoginPassKey');
+        if($lpk->enabledAdmin === 1) {
+            $f = wire('modules')->get('InputfieldButton');
+            $f->attr('name', 'btn');
+            $f->addClass(['top_button', 'add-passkey']);
+            $f->attr('value', "Add New");
+            $f->attr('href', '#');
+            $f->showInHeader(true);
+            $form->add($f);
+        }
+
+        /** @var InputfieldButton $f */
+        $f = $modules->get('InputfieldSubmit');
+        $f->attr('name', 'submit_delete_checked');
+        $f->value = $this->_('Delete checked');
+        $f->addClass('btn-delete-checked');
+        $f->icon = 'trash';
+        $f->showInHeader(true);
+        $form->add($f);
+
+        if($input->post('submit_delete_checked') && is_array($input->post('deletes'))) {
+            $count = $this->deletePassKeys($form);
+            if($count > 0) {
+                $this->message(sprintf(_n('%d PassKey deleted from database.', '%d PassKeys deleted from database.', $count), $count));
+                $this->session->redirect($this->wire()->page->url);
+            }
+        }
+        return $form->render();
+    }
+
+    public function renderPagination()
+    {
+        $input = $this->wire('input');
+    //    $items_per_page = 2;
+        $start = ($input->pageNum - 1) * $this->limit;
+        $total = (int)$this->countCredentialsInDb();
+
+        $passKeys = $this->getAllCredentialsFromDB();
+
+        $listed = array_slice($passKeys, $start, $this->limit); // Key difference
+
+        $a = new PageArray();
+        $a->setDuplicateChecking(false);
+        foreach ($listed as $listing) $a->add(new Page());
+
+        $a->setTotal($total);
+        $a->setLimit($this->limit);
+        $a->setStart($start);
+
+        return $a->renderPager();
+    }
+
+    public function getAllCredentialsFromDB()
+    {
+        $lpk = $this->wire('modules')->get('LoginPassKey');
+        $input = $this->wire('input');
+        $offset = $this->limit * ($input->pageNum - 1);
+
+        try {
+            $db = wire('database');
+            $sql = "SELECT `id`, `user_id`, `created` from " . $lpk->getTableName() . " LIMIT " . $offset . "," . $this->limit;
+            $query = $db->prepare($sql);
+            $query->closeCursor();
+            $query->execute();
+            $result = $query->fetchAll(\PDO::FETCH_OBJ);
+            return $result;
+        } catch (WireException $e) {
+            return "Database Error: " . $e->getMessage();
+        }
+    }
+
+    public function countCredentialsInDb()
+    {
+        $lpk = $this->wire('modules')->get('LoginPassKey');
+        $db = wire('database');
+        try {
+            $sql = "SELECT COUNT(id) FROM " . $lpk->getTableName();
+            $query = $db->prepare($sql);
+            $query->closeCursor();
+            $query->execute();
+            return $query->fetchColumn();
+        } catch (WireException $e) {
+            return "Database Error: " . $e->getMessage();
+        }
+    }
+
+    public function ___deletePassKeys($form)
+    {
+        $input = $this->wire('input');
+        $lpk = $this->wire('modules')->get('LoginPassKey');
+        $db = $this->wire('database');
+
+        // process deleted passkeys
+        $form->processInput($input->post); // for CSRF only
+        $ids = \implode(",", $input->post('deletes'));
+
+        $sql = "DELETE FROM " . $lpk->getTableName() . " WHERE id IN (" .$ids . ")";
+        $query = $db->prepare($sql);
+        $query->closeCursor();
+
+        try {
+            $query->execute();
+        } catch (WireException $e) {
+            throw new WireException("An error occurred while trying to delete: " . $e->getMessage());
+        }
+        return \count($input->post('deletes'));
+    }
+
+    public function ___getPassKeys($table, $checkbox)
+    {
+        $modules = $this->wire()->modules;
+        $sanitizer = $this->wire('sanitizer');
+        $users = $this->wire('users');
+
+        //$lpk = $modules->get("LoginPassKey");
+        $passkeys = $this->getAllCredentialsFromDB();
+
+        if(\count($passkeys) === 0) {
+            $table->row(['',$this->_("There are no passkeys."), '', '']);
+        }
+        foreach($passkeys as $passkey => $v) {
+            $checkbox->attr('id', "delete_" . $sanitizer->int($v->id));
+            $checkbox->attr('value', $v->id);
+
+            $user = $users->get($v->user_id);
+            $userName = $user instanceof NullPage ? $this->_('Unknown user') : $user->name;
+            $table->row([$v->id, $v->user_id, $userName, $v->created, $checkbox->render(),]);
+        }
+        return $table->render();
+
+    }
+
+    public function ___install()
+    {
+        parent::___install(); // Process modules must call parent method
+    }
+
+    public function ___uninstall()
+    {
+        parent::___uninstall(); // Process modules must call parent method
+    }
+}

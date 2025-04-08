@@ -9,15 +9,14 @@ namespace ProcessWire;
  * Clip Magic - Prue Rowland
  * Web: www.clipmagic.com.au
  * Email: admin@clipmagic.com.au
- *
+ * Licensed under MIT, see LICENSE.TXT
  *
  * For use with:
  * ProcessWire 3.x
  * Copyright (C) 2014 by Ryan Cramer
  * Licensed under GNU/GPL v2, see LICENSE.TXT
  *
- *
- */
+ **/
 
 class LoginPassKey extends WireData implements Module, ConfigurableModule
 {
@@ -32,7 +31,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     public $userDisplayName = null;
 
     public $crossPlatformAttachment = null;
-
+/*
+ *  Moved to LoginPassKey.info.php
     static public function getModuleInfo()
     {
         return [
@@ -40,11 +40,12 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             'author' => 'Clip magic',
             'version' => '0.0.1',
             'summary' => 'ProcessWire module that enables login via a passkey',
-            'autoload' => "template!=admin",
-    //        'singular' => true,
+            'autoload' => true,
+            'singular' => true,
             'requires' => ["PHP>=8.1", "ProcessWire>=3.0"]
         ];
     }
+*/
 
     public function getModuleConfigInputfields(array $data)
     {
@@ -52,6 +53,15 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $sanitizer = wire('sanitizer');
 
         $fields = new InputfieldWrapper();
+
+        // field for additional info/help text
+
+        $field = $modules->get('InputfieldMarkup');
+        $field->name = 'header_text';
+        $field->columnWidth = 100;
+        $field->markupText = _("After saving, if your User template(s) contain email fields, you'll be given the opportunity to select one. The user can then login with either their username or the selected email field address. Email addresses MUST be unique.");
+        $fields->add($field);
+
 
         // Authentication options
         $fieldset = $modules->get('InputfieldFieldset');
@@ -62,12 +72,26 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field = $modules->get('InputfieldCheckbox');
         $field->name = 'enabled';
         $field->value = null;
+        $field->columnWidth	= 50;
         $field->label = $this->_("Enable Frontend Passkey login");
         if (isset($data['enabled']) && $data['enabled'] !== '') {
             $field->value = $data['enabled'];
             $field->attr('checked', 'checked');
         }
         $fieldset->add($field);
+        // Enable Passkey login to Admin
+        $field = $modules->get('InputfieldCheckbox');
+        $field->name = 'enabledAdmin';
+        $field->value = null;
+        $field->columnWidth	= 50;
+        $field->label = $this->_("Enable Admin Passkey login");
+        if (isset($data['enabledAdmin']) && $data['enabledAdmin'] !== '') {
+            $field->value = $data['enabledAdmin'];
+            $field->attr('checked', 'checked');
+        }
+        $fieldset->add($field);
+
+
         $fields->add($fieldset);
 
         // Authentication options
@@ -93,7 +117,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field->value = !empty($data['rp']) ? $sanitizer->text($data['rp']) : $this->wire('config')->httpHost;
         $fieldset->add($field);
         $fields->add($fieldset);
-
 
         // ProcessWire User settings
         $fieldset = $modules->get('InputfieldFieldset');
@@ -121,7 +144,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field->name = 'user_fld';
         $field->label = $this->_("Identify User by username or email field");
         $field->columnWidth	= 33;
-        $field->notes = $this->_("After saving, a list of eligible email fields will be added");
+        $field->notes = $this->_("After saving, a list of eligible email fields will appear");
 
         $field->required = 1;
         $field->addOption('name', 'Username', ['selected' => 'selected']);
@@ -151,12 +174,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         if (!empty($data['roles'])) $field->attr('value', $data['roles']);
         $fieldset->add($field);
 
-        // API endpoint - registration
+        // API endpoint
         $field = $modules->get('InputfieldText');
         $field->name = 'api_url';
         $field->columnWidth	= 50;
         $field->label = $this->_("Path to your API ENDPOINT");
-        $field->value = "/path/to/your/api/registration/endpoint/";
+        $field->value = "/lpk-api/";
+        $field->notes = $this->_("Default is /lpk-api/");
         if(!empty($data['api_url']))
             $field->value = $data['api_url'];
         $field->required = 1;
@@ -170,8 +194,24 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         parent::__construct();
     }
 
-    public function init ()
+    public function init() : void
     {
+        $this->addHookAfter('Page::render', $this, 'addScriptsFE');
+
+        $this->wire()->addHookAfter('ProcessWire::ready', function($event) {
+            if(!method_exists($event->page, 'render')) {
+                $user = $this->wire('user');
+                if($user->isGuest() && $event->page->template->name === 'admin' && $this->enabledAdmin === 1) {
+                    $event->page->addHookBefore('render', function ($event) {
+                        $config = $this->wire('config');
+                        $config->scripts->add($config->urls($this) . $this->className() . ".js");
+                        $config->scripts->add($config->urls($this) . $this->className() . "Admin.js");
+                    });
+                    $event->page->addHookAfter('ProcessLogin::execute', $this, 'addLoginBtn');
+                }
+            }
+        });
+
         $this->addHook('Page::lpkFindUser', $this, 'lpkFindUser');
         $this->addHook('Page::lpkGetArgs', $this, 'lpkGetArgs');
         $this->addHook('Page::lpkPreRegisterUser', $this, 'lpkPreRegisterUser');
@@ -183,94 +223,129 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $this->addHook('Page::lpkGetUserByField', $this, 'lpkGetUserByField');
         $this->addHook('Page::lpkVerifyResponse', $this, 'lpkVerifyResponse');
         $this->addHook('Page::lpkGetErrorMessage', $this, 'lpkGetErrorMessage');
-
-        $this->addHookAfter('Page::render', $this, 'addScripts');
     }
 
+    public function ___ready() : void
+    {
+
+    }
     #---------------------
     # Hooks
     #---------------------
 
     // Methods added to Page for use in templates
-    public function lpkFindUser(HookEvent $event) {
+    public function lpkFindUser(HookEvent $event)
+    {
         $user = $event->arguments(0);
         $event->return = $this->findUser($user);
     }
 
-    public function lpkGetApiUrl(HookEvent $event) {
-
-       $event->return = $this->api_url;
+    public function lpkGetApiUrl(HookEvent $event)
+    {
+        $event->return = $this->api_url;
     }
 
-    public function lpkGetApiHttpUrl(HookEvent $event) {
+    public function lpkGetApiHttpUrl(HookEvent $event)
+    {
         $event->return = 'https://' . $this->rp  .  $this->api_url;
     }
 
-    public function lpkGetArgs(HookEvent $event) {
+    public function lpkGetArgs(HookEvent $event)
+    {
         $event->return = $this->getlpkargs();
     }
-    public function lpkPreRegisterUser(HookEvent $event) {
+
+    public function lpkPreRegisterUser(HookEvent $event)
+    {
         $user = $event->arguments(0);
         $event->return = $this->preRegisterUser($user);
     }
 
-    public function lpkGetUserByField(HookEvent $event) {
+    public function lpkGetUserByField(HookEvent $event)
+    {
         $username = $event->arguments(0);
         $event->return = $this->_getUserByField($username);
     }
-    public function lpkGetErrorMessage(HookEvent $event) {
+
+    public function lpkGetErrorMessage(HookEvent $event)
+    {
         $errormsg = $event->arguments(0);
         $event->return = $this->getErrorMessage($errormsg);
     }
 
-    public function lpkRegisterUser(HookEvent $event) {
+    public function lpkRegisterUser(HookEvent $event)
+    {
         $user = $event->arguments(0);
         $dn = $event->arguments(1);
         $event->return = $this->registerUser($user, $dn);
     }
 
-    public function lpkVerify(HookEvent $event) {
+    public function lpkVerify(HookEvent $event)
+    {
         $user = $event->arguments(0);
         $event->return = $this->verifyUser($user);
     }
 
-    public function lpkVerifyResponse(HookEvent $event) {
+    public function lpkVerifyResponse(HookEvent $event)
+    {
         $authenticatorResponse = $event->arguments(0);
         $event->return = $this->verifyResponse($authenticatorResponse);
     }
 
     // lpk only hooks
-    public function addScripts(HookEvent $event)
+    public function addScriptsFE(HookEvent $event)
     {
         $return = $event->return;
-        // TODO modify config data to allow dev choice of javascripts and CSS
         if(!$this->enabled) return;
         if($this->page->template->name !== 'admin') {
-            $css = "<link rel='stylesheet' href='" . $this->config()->urls($this) . $this->className() . ".css'>";
-            $out = str_ireplace("</head>", $css . '</head>', $event->return);
-
-
             $js = "<script src='" . $this->config()->urls($this) . $this->className() . ".js'></script>";
-            // horrible to put it in the head but iOS crap at honouring DOMContentLoaded
-            $return = str_ireplace("</head>", $js . '</head>', $out);
+            $return = str_ireplace("</body>", $js . "</body>", $event->return);
         }
         $event->return = $return;
     }
 
-    public function getDatabase() {
+    public function addLoginBtn(HookEvent $event)
+    {
+        if($this->user->isLoggedin()) return;
+
+        $return = $event->return;
+
+        $output = '';
+        $addNew = wire('modules')->get('InputfieldButton');
+        $addNew->attr('id+name', 'lpk');
+        $addNew->addClass('top_button');
+        $addNew->attr('value', $this->_("Login with PassKey"));
+        $addNew->icon = 'key';
+        $addNew->attr('href', '#');
+
+        $output .= $addNew->render();
+        $output .= "<div id='end' class='uk-margin'></div>";
+
+        $modules = $this->wire('modules');
+        $apiUrl = $modules->getConfig('LoginPassKey')['api_url'];
+        $output .= "<script>let apiUrl = '$apiUrl'</script>";
+
+        $return .= $output;
+        $event->return = $return;
+    }
+
+    public function getDatabase()
+    {
         return wire('database');
     }
 
-    public function getTableName() : string{
+    public function getTableName() : string
+    {
         return wire('sanitizer')->pageName($this->className());
     }
 
-    public function showUser() {
+    public function showUser()
+    {
         return $this->user;
     }
 
-    public function findUser(mixed $username = null) {
-
+    public function findUser(mixed $username = null)
+    {
         /*
          * Scenarios
          * 1. Username field empty xx
@@ -289,6 +364,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         if(empty($username)) {
             $output->fn = 'findUser';
             $output->msg = $this->getErrorMessage(60);
+            $output->errno = 60;
             $output->next = 'end';
             return $output;
         }
@@ -297,32 +373,17 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $user = wire('user');
         $feUser = $this->_getUserByField($username);
 
-        // Scenario 9 - put it early to make it quicker to execute
-        $loggedInWithPassKey = $this->wire('session')->getFor('lpk', 'success');
-        if(!$user->isGuest() && !!($loggedInWithPassKey)) {
-            bd($loggedInWithPassKey, 'lpk success');
-
-            // User used a passkey to login
-            $output->fn = 'findUser';
-            $output->msg = $this->_('Already logged in with PassKey');
-            $output->next = 'end';
-            $output->un = $username;
-            return $output;
-        }
-
-
-
         // Scenario 3
-
         if($feUser instanceof NullPage) {
         //    $output->id = $feUser->id;
+            bd($feUser);
+
             $output->msg = $this->getErrorMessage(65) . $username;
+            $output->errno = 65;
             $output->fn = 'findUser';
             $output->next = 'end';
             return $output;
         }
-
-
 
         // Now to see if the FE User is allowed to use WebAuthn
         $allowed = false;
@@ -332,10 +393,10 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
         if(!$allowed) {
             $output->msg = $this->getErrorMessage(70);
+            $output->errno = 70;
             $output->next = 'end';
             return $output;
         }
-
 
         // Superuser must be checked to allow Superusers to use WebAuthn
         // Superusers by default have all permissions
@@ -345,6 +406,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         if (!$allowed) {
             $output->un = $username;
             $output->msg = $this->getErrorMessage(80);
+            $output->errno = 80;
             $output->fn = 'finduser';
             $output->next = 'end';
             return $output;
@@ -354,10 +416,31 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         if($feUser instanceof User && $user->isLoggedin() && $user->id !== $feUser->id) {
             $output->un = $username;
             $output->msg = $this->getErrorMessage(90);
+            $output->errno = 90;
             $output->fn = 'finduser';
             $output->next = 'end';
             return $output;
         }
+
+        // Scenario 9
+        $loggedInWithPassKey = $this->wire('session')->getFor('lpk', 'success');
+        if(!$user->isGuest()) {
+            // User used a passkey to login
+            $output->fn = 'findUser';
+            if(!!$loggedInWithPassKey) {
+                $output->msg = $this->getErrorMessage(66);
+                $output->errno = 66;
+                $output->next = 'end';
+            } else {
+//                $output->msg = $this->getErrorMessage(67);
+                $output->errno = 67;
+                $output->next = 'register';
+            }
+            //   $output->msg = !!($loggedInWithPassKey) ? $this->getErrorMessage(66) : $this->getErrorMessage(67);
+            $output->un = $username;
+            return $output;
+        }
+
 
         // The user is legit and permitted to use WebAuthn
         if($feUser->isGuest() ) {
@@ -377,16 +460,10 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
 
         // Action to take for loggedin user if in/out of lpkDB
-//        $count = $this->_checklpkDB($feUser);
-
-//        $action = $count > 0 ? "end" : "register";
-
-//        $action = !empty($loggedInWithPassKey) ? "end" : "register";
         $output->un = $username;
         $output->fn = 'finduser';
         $output->next = "register";
         return $output;
-
     }
 
     private function _getUserByField($username)
@@ -402,7 +479,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return $user;
     }
 
-    private function _checklpkDB($user) {
+    private function _checklpkDB($user)
+    {
         // OK they're a valid user
         // Now let's see if they have existing credentials
         try {
@@ -414,6 +492,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                 $query->closeCursor();
                 $query->execute();
                 $result = $query->fetchAll(\PDO::FETCH_ASSOC);
+                //bd($user->id);
                 return (int) $result[0]["COUNT(user_id)"];
             }
         } catch (WireException $e) {
@@ -421,7 +500,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
     }
 
-    private function _getCredentialsFromDB(User $user) {
+    private function _getCredentialsFromDB(User $user)
+    {
         try {
             $db = wire('database');
             $sql = "SELECT `credential_id` from " . $this->getTableName() . " where user_id=" . $user->id;
@@ -463,10 +543,11 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return $args;
     }
 
-    private function _saveCredentialToDB($created) {
+    private function _saveCredentialToDB($created)
+    {
         // User has to be logged in to get to this point
         $user = $this->wire('user');
-        $db = wire('database');
+        $db = $this->wire('database');
 
         $sql = <<<SQL
             INSERT INTO {$this->getTableName()}
@@ -578,7 +659,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     public function registerUser($user, $credData)
     {
         $clientDataJSON = $this->base64url_decode($credData->clientDataJSON);
-        $created = $this->processCreate($user, $clientDataJSON);
+        $this->processCreate($user, $clientDataJSON);
     }
 
     public function processCreate($user, $clientDataJSON)
@@ -600,7 +681,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         try {
             $this->_saveCredentialToDB($toDB);
             $data->created = true;
-            $data->msg = $this->_('Successfully registered.');
+//            $data->msg = $this->_('Successfully registered.');
+            $data->msg = $this->getErrorMessage(102);
+            $data->errno = 102;
         } catch(WireException $e) {
             $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
             $data->created = false;
@@ -626,15 +709,19 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         $output = new \stdClass();
         $output->fn = 'verify';
+        $output->msg = $this->getErrorMessage(8);
+        $output->errno = 8;
 
         if(!empty($authenticatorAttestationResponse)) {
-            $output->msg = $this->_('Verified and logged in successfully');
+            $output->msg = $this->getErrorMessage(101);
+            $output->errno = 101;
         }
         $output->next = 'end';
         return $output;
     }
 
-    public function getlpkargs() {
+    public function getlpkargs()
+    {
         $data = wire('modules')->getConfig($this);
         unset($data['enabled']);
         $data['attestation_format'] = $this->attestationFormat;
@@ -659,7 +746,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     # Utility functions
     #---------------------
 
-    public function getErrorMessage(int $mgsNumber = 99) {
+    public function getErrorMessage(int $mgsNumber = 99)
+    {
         switch ($mgsNumber) {
             case 1:
                 return $this->_('Sorry, your browser does not support this feature');
@@ -668,15 +756,21 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             case 3:
                 return $this->_("Failed to get authenticator attestation response");
             case 4:
-                return $this->_('Failed to get credentials');
+                return $this->_('Failed to get credentials. Please use your password to log in.');
             case 5:
                 return $this->_('Failed to get authenticator attestation response');
+            case 8:
+                return $this->_('Failed to verify');
             case 50:
-                return $this->_('User must login with password to register for passkey');
+                return $this->_('Please login with your password to register your passkey');
             case 60:
                 return $this->_("No username provided");
             case 65:
                 return $this->_("No user with name: ");
+            case 66:
+                return $this->_("Already logged in with passkey");
+            case 67:
+                return $this->_("Already logged in with password");
             case 70:
                 return $this->_("User does not have permission to use WebAuthn");
             case 80:
@@ -686,11 +780,15 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             case 99:
             default:
                 return $this->_('Unknown error');
+            case 101:
+                return $this->_('Verified and logged in successfully');
+            case 102:
+                return $this->_('Successfully registered');
         }
-
     }
 
-    public function base64url_decode($data) {
+    public function base64url_decode($data)
+    {
         return base64_decode(str_pad(strtr($data, '-_', '+/'), 4 - ((strlen($data) % 4) ?: 4), '=', STR_PAD_RIGHT));
     }
 
@@ -698,21 +796,91 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     # Install and Uninstall
     #---------------------
 
-    public function ___install() {
+    public function ___install()
+    {
         $this->_createTable();
+
+        // TODO create template and template file
+        $templates = $this->wire('templates');
+        $files = $this->wire('files');
+        $pages = $this->wire('pages');
+
+        $lpkTemplate = $templates->get('name=lpk-api');
+        if(!$lpkTemplate) {
+
+            // Create fieldgroup
+            $fieldgroup = new Fieldgroup();
+            $fieldgroup->name = 'lpk-api';
+            $fieldgroup->add('title');
+
+            // save fieldgroup
+            $this->wire('fieldgroups')->save($fieldgroup);
+
+            // get fieldgroup
+            $fieldgroup = wire('fieldgroups')->get('lpk-api');
+
+            // Create template
+            $template = new Template();
+            $template->name = 'lpk-api';
+            $template->label = 'LoginPassKey API Template';
+            $template->fieldgroup = $fieldgroup;
+            $template->filename = $this->config->paths->templates . 'lpk-api.php';
+            $template->noChildren = 1;
+            $template->noParents = -1; // one page only
+            $template->urlSegments = "start register verify end";
+            $template->https = 1; // always only https
+            $template->noAppendTemplateFile = 1; // disable auto-append of eg _main.php
+            $template->noUnpublish = 1; // must always be published
+
+            // save template
+            $templates->save($template);
+        }
+
+        $templateFileExists = $files->exists($this->config->paths->templates . 'lpk-api.php');
+        if(!$templateFileExists) {
+            $files->copy($this->config->paths($this) . 'lpk-api.php', $this->config->paths->templates . 'lpk-api.php');
+        }
+
+        $apiPage = $pages->get("name=lpk-api");
+        if($apiPage instanceof NullPage) {
+            $apiPage = new Page();
+            $apiPage->name = 'lpk-api';
+            $apiPage->parent = 1;
+            $apiPage->template = 'lpk-api';
+            $apiPage->of(false);
+            $apiPage->title = $this->_('LoginPassKey API');
+            $apiPage->status(['hidden', 'published']);
+            $apiPage->save();
+        }
     }
 
-    /**
-     * Remove the WA table
-     */
-    public function ___uninstall() {
+    public function ___uninstall()
+    {
+        $pages = $this->wire('pages');
+        $templates = $this->wire('templates');
+        $files = $this->wire('files');
+
+        $apiPage = $pages->get('name=lpk-api');
+        if(!$apiPage instanceof NullPage) {
+            $pages->delete($apiPage);
+        }
+
+        $apiTpl = $templates->get('name=lpk-api');
+        if($apiTpl instanceof Template) {
+            $templates->delete($apiTpl);
+        }
+
+        $tplFileExists = $files->exists($this->config->paths->templates . 'lpk-api.php');
+        if(!$tplFileExists) {
+            $files->unlink($this->config->paths->templates . 'lpk-api.php');
+        }
+
+
         $this->_deleteTable();
     }
 
-    /**
-     * Create a table where we store user data.
-     */
-    protected function _createTable() {
+    protected function _createTable()
+    {
         $sql = "CREATE TABLE IF NOT EXISTS `" . $this->getTableName() . "` ( " .
             "id INT(10) NOT NULL AUTO_INCREMENT, " .
             "user_id INT(10) UNSIGNED NOT NULL, " .
@@ -724,19 +892,14 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             "INDEX credential_id_index (user_id) " .
             ")";
 
-
         $db = $this->getDatabase();
         return $db->exec($sql);
     }
 
-    /**
-     * @return void
-     */
     protected function _deleteTable()
     {
         $db = $this->getDatabase();
         $sql = "DROP TABLE IF EXISTS " . $this->getTableName();
         $db->exec($sql);
     }
-
 }

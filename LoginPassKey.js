@@ -26,32 +26,36 @@ let lpk = {
             $data = {
                 fn: 'end',
                 next: 'end',
-                error: 1
+                errno: 1
             }
-             return connectPost(data,url)
+             return await connectPost(data,url).then(
+                 (res) => {
+                     if (res.end) return res
+
+                 }
+             )
         }
 
         switch (urlSegment) {
             case 'start':
-                const userFld = document.querySelector('.webauthn')
+                const userFld = document.getElementById('login_name')
                 // OK, start the process
                 data = {
-                    un: userFld.value,
+                    un: userFld.value.trim(),
                     fn: 'start',
                     next: 'finduser'
                 }
                 // Change the url to the next step in the process
                 url.replace(urlSegment, data.next)
-                return connectPost(data,url)
+                return await connectPost(data,url)
                     .then(
                     (res) => {
-                        if(res.end) return res
+                        if(res && res.end) return res
                         return lpk.action(`${apiUrl}${data.next}`,res)
                     } )
                 break;
 
             case 'finduser':
-                console.log('fwd in finduser: ', fwd)
                 data = {
                     fn: 'finduser',
                     next: fwd.data.next,
@@ -60,7 +64,7 @@ let lpk = {
 
                 // Change the url to the next step in the process
                 url.replace(urlSegment, data.next)
-                 return connectPost(data,url)
+                 return await connectPost(data,url)
                     .then(
                         (res) => {
                             if(res.end) return res
@@ -69,6 +73,7 @@ let lpk = {
                break;
 
             case 'register':
+                console.log(fwd)
                 let pk = fwd.data.pk
 
                 pk.publicKey.user.id  = encoder.encode(pk.publicKey.user.id ).buffer;
@@ -97,20 +102,21 @@ let lpk = {
                     data = {
                         fn: 'register',
                         next: 'end',
-                        aarcreate: authenticatorAttestationResponse
+                        aarcreate: authenticatorAttestationResponse,
+                        errno: 101
                     }
                 } else {
                     data = {
                         fn: 'register',
                         next: 'end',
                         aarcreate: null,
-                        error: 2
+                        errno: 2
                     }
                 }
                 // Progress to the next step in the process
                 url.replace(urlSegment, data.next)
                 urlSegment = data.next
-                return connectPost(data,url)
+                return await connectPost(data,url)
                     .then(
                         (res) => {
                             if(res.end) return res
@@ -144,24 +150,25 @@ let lpk = {
                         userHandle: cred.response.userHandle ? arrayBufferToBase64(cred.response.userHandle) : null
                     }
                     data = {
-                        fn: 'verify',
-                        next: 'end',
-                        aarverify: authenticatorAttestationResponse
+                        fn: "verify",
+                        next: "end",
+                        aarverify: authenticatorAttestationResponse,
+                        errno: 101
                     }
 
                 } else {
                     data = {
-                        fn: 'verify',
-                        next: 'end',
+                        fn: "verify",
+                        next: "end",
                         aarverify: null,
-                        error: 4
+                        errno: 4
                     }
                 }
 
                     // Change the url to the next step in the process
                     url.replace(urlSegment, data.next)
                     urlSegment = data.next
-                    return connectPost(data, url)
+                    return await connectPost(data, url)
                         // Change the url to the next step in the process
                         .then(
                             (res) => {
@@ -171,17 +178,28 @@ let lpk = {
                 break;
 
             case 'end':
-                console.log('fwd in end: ', fwd)
                 if(fwd) {
+
+                    // TODO resolve why register and verify return different objects in end
                     result = {}
                     result.end = true
-                    if(fwd && fwd.data.msg)
-                        result.msg = fwd.data.msg
-                    if(fwd && fwd.data.error)
-                        result.error = fwd.data.error
-                    if(fwd && fwd.data.un)
-                        result.un = fwd.data.un
+                    if(fwd && fwd.msg)
+                        result.msg = fwd.msg
+                    if(fwd && fwd.error)
+                        result.error = fwd.error
+                    if(fwd && fwd.un)
+                        result.un = fwd.un
+                    if(fwd && fwd.errno)
+                        result.errno = fwd.errno
 
+                    if(fwd && fwd.data && fwd.data.msg)
+                        result.msg = fwd.data.msg
+                    if(fwd && fwd.data && fwd.data.error)
+                        result.error = fwd.data.error
+                    if(fwd && fwd.data && fwd.data.un)
+                        result.un = fwd.data.un
+                    if(fwd && fwd.data && fwd.data.errno)
+                        result.errno = fwd.data.errno
                     return result
                 }
                 break;
@@ -194,6 +212,7 @@ let lpk = {
 
 const connectPost = async (data, url) => {
     let body = JSON.stringify(data)
+
     try {
         let connect = await fetch(url, {
             method: "POST",
