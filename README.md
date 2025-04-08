@@ -81,7 +81,11 @@ The match to these scenarios triggers one of three possible actions:
 <a id="installation"></a>
 ## Installation
 During the installation process, the module creates:
-- The Api template. The default name is `lkp-api` that includes attributes such as one page only, no children and disables appending of `_main.php`.
+- The Api template. The default name is `lkp-api` that includes attributes such:
+  - as one page only, 
+  - no children,
+  - urlSegments `start`, `register`, `verify` and `end`, and
+  - disables appending of `_main.php`.
 - A publicly accessible page which is assigned the `lkp-api` template and is `hidden`.
 - It is then up to you to create a login page. See `examples/loginpasskey-page-tpl.php` for inspiration.
 <a id="configuration"></a>
