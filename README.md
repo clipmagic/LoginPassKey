@@ -10,6 +10,7 @@ This module enables users to log in to ProcessWire with a WebAuthn passkey rathe
    * [Features](#features)
    * [How it works (Short version)](#how-it-works-short-version)
    * [How it works (Long version TLDR;)](#how-it-works-long-version-tldr)
+   * [Installation ](#installation)
    * [Configuration](#configuration)
       + [Activate Module](#activate-module)
       + [Authentication options](#authentication-options)
@@ -78,6 +79,12 @@ The match to these scenarios triggers one of three possible actions:
 2. Go through the passkey registration process
 3. Verify the passkey and log in the user
 
+<a id="installation"></a>
+## Installation
+During the installation process, the module creates:
+- The Api template. The default name is `lkp-api` that includes attributes such as one page only, no children and disables appending of `_main.php`.
+- A publicly accessible page which is assigned the `lkp-api` template that includes setting including `hidden`.
+- It is then up to you to create a login page. See `examples/loginpasskey-page-tpl.php` for inspiration.
 <a id="configuration"></a>
 ## Configuration
 The module configuration fields are:
