@@ -102,7 +102,7 @@ The module configuration fields are:
 ### Authentication options
 - **Application name** - the shortname that some passkey authenticators will display to enable users to differentiate between passkeys.
 - **Host name** - The Replying Party host name. Default is the current `$config->host`.
-- 
+
 <a id="processwire-user-info"></a>
 ### ProcessWire user info
 - **User template** (required) - defaults to the system `user` template. After saving, any other user templates will display.
