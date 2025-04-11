@@ -78,7 +78,9 @@
 </div>
 
 <script>
-    const apiUrl = "<?=$page->lpkGetApiUrl()?>";
+    let apiUrl = "<?=$page->lpkGetApiUrl()?>";
+    let redirectUrl = "<?=$page->lpkGetRedirectUrl()?>"
+    if(!redirectUrl) redirectUrl = 'window.location.href'
 
     // hacky solution for iOS not always honouring DOMContentLoaded
     function runOnStart() {
@@ -88,10 +90,14 @@
         btn.addEventListener('click', (e) => {
             e.preventDefault()
             lpk.action(`${apiUrl}start`).then (res => {
+
+                // check the result
                 console.log(res)
                 if(res && res.msg) {
+                    // window.location.href = redirectUrl
                     end.textContent = res.msg
                 }
+
                 if(res && res.error) {
                     end.textContent = res.error
                 }

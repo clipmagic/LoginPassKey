@@ -16,13 +16,12 @@
 $info = [
     'title' => 'Login with a PassKey for ProcessWire',
     'author' => 'Clip magic',
-    'version' => '0.0.1',
+    'version' => '0.0.2Beta',
     'summary' => 'ProcessWire module that enables login with a passkey',
     'icon' => 'key',
     'autoload' => true,
     'singular' => true,
     'requires' => ["PHP>=8.1", "ProcessWire>=3.0"],
     'installs' => ['ProcessLoginPassKey'],
-    // TODO update link to modules directory
-    'href' => 'https://processwire.com/modules/process-hello/'
+    'href' => 'https://processwire.com/modules/login-pass-key/'
 ];

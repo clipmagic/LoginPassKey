@@ -185,7 +185,21 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $field->value = $data['api_url'];
         $field->required = 1;
         $fieldset->add($field);
-       $fields->add($fieldset);
+        $fields->add($fieldset);
+
+        // Redirect on login
+        $field = $modules->get('InputfieldText');
+        $field->name = 'redirect_url';
+        $field->columnWidth	= 50;
+        $field->label = $this->_("Page to redirect to on login (Frontend only)");
+        $field->value = "'/'";
+        $field->notes = $this->_("ID or path");
+        if(!empty($data['redirect_url']))
+            $field->value = $data['redirect_url'];
+
+        $fieldset->add($field);
+        $fields->add($fieldset);
+
         return $fields;
     }
 
@@ -200,23 +214,34 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         $this->wire()->addHookAfter('ProcessWire::ready', function($event) {
             if(!method_exists($event->page, 'render')) {
+
                 $user = $this->wire('user');
-                if($user->isGuest() && $event->page->template->name === 'admin' && $this->enabledAdmin === 1) {
+                if($event->page->template->name === 'admin' && $this->enabledAdmin === 1) {
                     $event->page->addHookBefore('render', function ($event) {
                         $config = $this->wire('config');
                         $config->scripts->add($config->urls($this) . $this->className() . ".js");
                         $config->scripts->add($config->urls($this) . $this->className() . "Admin.js");
                     });
-                    $event->page->addHookAfter('ProcessLogin::execute', $this, 'addLoginBtn');
+                    bd($this->wire('session')->lpk, 'lpk session');
+
+                    $event->page->addHookAfter('ProcessLogin::buildLoginForm', $this, 'addLoginBtn');
+
+                    $session = $this->wire('session');
+                    if(!empty($session->getFor('lpk', 'success'))) {
+                        // show passkey registration popup if not already logged in with passkey
+                        $this->wire()->addHookAfter('ProcessLogin::execute', $this, 'registerAdmin');
+                    }
                 }
             }
         });
+
 
         $this->addHook('Page::lpkFindUser', $this, 'lpkFindUser');
         $this->addHook('Page::lpkGetArgs', $this, 'lpkGetArgs');
         $this->addHook('Page::lpkPreRegisterUser', $this, 'lpkPreRegisterUser');
         $this->addHook('Page::lpkRegisterUser', $this, 'lpkRegisterUser');
         $this->addHook('Page::lpkGetApiUrl', $this, 'lpkGetApiUrl');
+        $this->addHook('Page::lpkGetRedirectUrl', $this, 'lpkGetRedirectUrl');
         $this->addHook('Page::lpkGetApiHttpUrl', $this, 'lpkGetApiHttpUrl');
         $this->addHook('Page::lpkGetWebAuthn', $this, 'lpkGetWebAuthn');
         $this->addHook('Page::lpkVerify', $this, 'lpkVerify');
@@ -243,6 +268,11 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     public function lpkGetApiUrl(HookEvent $event)
     {
         $event->return = $this->api_url;
+    }
+
+    public function lpkGetRedirectUrl(HookEvent $event)
+    {
+        $event->return = $this->wire('pages')->get($this->redirect_url)->url;
     }
 
     public function lpkGetApiHttpUrl(HookEvent $event)
@@ -308,26 +338,77 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         if($this->user->isLoggedin()) return;
 
-        $return = $event->return;
+        $form = $event->return;
+        $modules = $this->wire('modules');
 
-        $output = '';
-        $addNew = wire('modules')->get('InputfieldButton');
-        $addNew->attr('id+name', 'lpk');
-        $addNew->addClass('top_button');
-        $addNew->attr('value', $this->_("Login with PassKey"));
-        $addNew->icon = 'key';
-        $addNew->attr('href', '#');
+        $passKeyButton = $modules->get('InputfieldButton');
+        $passKeyButton->attr('id+name', 'lpk');
+        $passKeyButton->addClass('top_button');
+        $passKeyButton->attr('value', $this->_("Login with PassKey"));
+        $passKeyButton->icon = 'key';
+        $passKeyButton->attr('href', '#');
+        $form->add($passKeyButton);
 
-        $output .= $addNew->render();
-        $output .= "<div id='end' class='uk-margin'></div>";
+        $markUp = $modules->get('InputfieldMarkup');
+        $markUp->attr('id+name', 'end');
 
+        $html = "<div id='end' class='uk-margin'></div>";
         $modules = $this->wire('modules');
         $apiUrl = $modules->getConfig('LoginPassKey')['api_url'];
-        $output .= "<script>let apiUrl = '$apiUrl'</script>";
+        $html .= "<script>let apiUrl = '$apiUrl'</script>";
+        $markUp->value = $html;
+        $form->add($markUp);
 
-        $return .= $output;
+        $event->return = $form;
+    }
+
+    public function registerAdmin(HookEvent $event) {
+        bd('user has an allowed role and logged into admin');
+
+        // Register a logged in front end user
+        $session = $this->wire('session');
+//    if(!empty($session->getFor('lpk', 'success'))) return;
+
+    $user = $this->wire('user');
+    $lpk = $this->wire('modules')->get('LoginPassKey');
+    $modConfig = wire('modules')->getConfig('LoginPassKey');
+    $apiUrl = $modConfig['api_url'];
+    $input = $this->wire('input');
+
+    $allowed = false;
+    foreach($modConfig['roles'] as $role) {
+        if($user->hasRole($role)) {
+            $allowed = true;
+        }
+    }
+
+    if ($input->get->login === 1 && $allowed) {
+
+        // auto trigger the registration process
+        $fwd = new \stdClass();
+        $fwd->fn = 'finduser';
+        $fwd->un = $user->name;
+
+        $data = new \stdClass();
+        $data->pk = $lpk->preRegisterUser($user);
+        $data->next = 'register';
+
+        $fwd->data = $data;
+        $fwdJSON = json_encode($fwd);
+
+        $js  = "<script>";
+        $js .= "let apiUrl = '$apiUrl'\n";
+        $js .= "lpk.registerOnly($apiUrl, $fwdJSON)\n";
+        $js .= "</script>";
+        $return = str_ireplace("</body>", $js . "</body>", $event->return);
+
+        // regardless of outcome, only run once per session
+        $session->setFor('lpk', 'success', 'success');
         $event->return = $return;
     }
+}
+
+
 
     public function getDatabase()
     {
@@ -709,12 +790,19 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         $output = new \stdClass();
         $output->fn = 'verify';
-        $output->msg = $this->getErrorMessage(8);
-        $output->errno = 8;
+        $output->msg = $this->getErrorMessage(4);
+        $output->errno = 4;
 
         if(!empty($authenticatorAttestationResponse)) {
-            $output->msg = $this->getErrorMessage(101);
-            $output->errno = 101;
+            $sanitizer = $this->wire('sanitizer');
+            $session = $this->wire('session');
+            $userHandle = $sanitizer->int($this->base64url_decode($authenticatorAttestationResponse->userHandle));
+            $user = $sanitizer->int($session->getFor('lpk', 'userid'));
+
+            if($user === $userHandle) {
+                $output->msg = $this->getErrorMessage(101);
+                $output->errno = 101;
+            }
         }
         $output->next = 'end';
         return $output;
@@ -756,7 +844,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             case 3:
                 return $this->_("Failed to get authenticator attestation response");
             case 4:
-                return $this->_('Failed to get credentials. Please use your password to log in.');
+                return $this->_('Failed to verify your passkey. Please use your password to log in.');
             case 5:
                 return $this->_('Failed to get authenticator attestation response');
             case 8:

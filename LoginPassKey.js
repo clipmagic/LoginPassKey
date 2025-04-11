@@ -73,7 +73,10 @@ let lpk = {
                break;
 
             case 'register':
-                console.log(fwd)
+                if (typeof fwd === 'string') {
+                    fwd = JSON.parse(fwd)
+                }
+
                 let pk = fwd.data.pk
 
                 pk.publicKey.user.id  = encoder.encode(pk.publicKey.user.id ).buffer;
@@ -207,6 +210,12 @@ let lpk = {
             default:
                 break;
         }
+    },
+
+    // used on frontend, eg in LoginRegisterPro to create a new passkey
+    registerOnly: async (apiUrl, data) => {
+        await lpk.action(`${apiUrl}register`, data).then (res => {
+        })
     }
 }
 
