@@ -145,7 +145,7 @@ let lpk = {
 
                 if(cred) {
                     //create object for transmission to server
-                    authenticatorAttestationResponse = {
+                    let authenticatorAttestationResponse = {
                         id: cred.rawId ? arrayBufferToBase64(cred.rawId) : null,
                         clientDataJSON: cred.response.clientDataJSON ? arrayBufferToBase64(cred.response.clientDataJSON) : null,
                         authenticatorData: cred.response.authenticatorData ? arrayBufferToBase64(cred.response.authenticatorData) : null,
@@ -175,7 +175,7 @@ let lpk = {
                         // Change the url to the next step in the process
                         .then(
                             (res) => {
-                               if(res.end) return res
+                               if(res && res.end) return res
                                 return lpk.action(`${apiUrl}${data.next}`, res)
                             })
                 break;
@@ -212,7 +212,7 @@ let lpk = {
         }
     },
 
-    // used on frontend, eg in LoginRegisterPro to create a new passkey
+    // used when user logged in to create a new passkey
     registerOnly: async (apiUrl, data) => {
         await lpk.action(`${apiUrl}register`, data).then (res => {
         })

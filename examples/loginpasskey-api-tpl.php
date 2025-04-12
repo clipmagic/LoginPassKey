@@ -12,17 +12,6 @@
  * Licensed under GNU/GPL
  *
  * https://processwire.com
- *
- * This template should be configured with:
- * 1. No children
- * 2. Allow page segments
- * 3. UrlSegments: 'start', 'register', 'verify', 'end'
- * 4. For use on one page only
- * 5. Disallow auto-append of _main.php
- * 6. It must be published and directly accessible from the web
- * 7. The only custom field required is "Title" which is added automatically
- * 8. Disable multi-language features
- *
  */
 
 $post = trim(file_get_contents('php://input'));
@@ -40,11 +29,14 @@ if ($post) {
             $foundUser = $page->lpkFindUser($data->un);
             // save the username as we'll need it later
             $session->setFor('lpk', 'username', $data->un);
+
             if(empty($foundUser->msg)) {
                 // any messages go straight to 'end'
                 // now we need the ProcessWire User object
                 $feUserObj = $page->lpkGetUserByField($foundUser->un);
+
                 if ($feUserObj instanceof User) {
+                    $session->setFor('lpk', 'userid', $feUserObj->id);
                     if (!$feUserObj->isLoggedin()) {
                         // they're not logged in but have registered for WebAuthn
                         $lpkData->data->verifyArgs = $page->lpkVerify($feUserObj);
@@ -74,6 +66,7 @@ if ($post) {
                     $session->setFor('lpk', 'success', 'success');
                     $session->removeFor('lpk', 'username');
                     $lpkData->data->msg = $data->msg;
+
                 }
             } else {
                 $lpkData->data->msg = $page->lpkGetErrorMessage(2);
@@ -87,6 +80,8 @@ if ($post) {
             if(($data->errno && $data->errno !== 101) || \is_null($data->aarverify)) {
                 $lpkData->msg = $page->lpkGetErrorMessage($data->errno);
                 $lpkData->errno = $data->errno;
+                $lpkData->data->next = 'end';
+
             } else {
                 $verified = $page->lpkVerifyResponse($data->aarverify);
                 $lpkData->data = $verified;
@@ -96,8 +91,14 @@ if ($post) {
                     $feUser = $page->lpkGetUserByField($username);
                     $session->setFor('lpk', 'success', 'success');
                     $session->forceLogin($feUser);
+                    $lpkConfig = $modules->getConfig('LoginPassKey');
+                    if($session->getFor('lpk', 'inadmin')) {
+                        $processLogin = $modules->get('ProcessLogin');
+                        $processLogin->execute();
+                    } elseif(!empty($lpkConfig['redirect_url'])) {
+                        $session->redirect($page->lpkGetRedirectURL());
+                    };
                 }
-                $lpkData->data->next = 'end';
             }
             break;
 

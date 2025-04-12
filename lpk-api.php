@@ -22,7 +22,6 @@ if ($post) {
     $lpkData = new \stdClass();
     $lpkData->data = $data;
 
-
     switch ($next) {
         case 'finduser':
 
@@ -92,10 +91,16 @@ if ($post) {
                     $feUser = $page->lpkGetUserByField($username);
                     $session->setFor('lpk', 'success', 'success');
                     $session->forceLogin($feUser);
-                    $session->redirect($page->lpkGetRedirectURL());
+                    $lpkConfig = $modules->getConfig('LoginPassKey');
+                    if($session->getFor('lpk', 'inadmin')) {
+                        $processLogin = $modules->get('ProcessLogin');
+                        $processLogin->execute();
+                    } elseif(!empty($lpkConfig['redirect_url'])) {
+                        $session->redirect($page->lpkGetRedirectURL());
+                    };
                 }
             }
-           break;
+            break;
 
         case 'end':
         case 'start':
