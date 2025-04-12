@@ -1,9 +1,8 @@
 <?php namespace ProcessWire;
 
-
-// LoginPassKey with LoginRegisterPro - add button & script to login FE page
-// LoginPassKey with LoginRegisterPro - add button & script to login FE page
+// LoginPassKey with LoginRegisterPro
 if($modules->isInstalled('LoginRegisterPro')){
+    // Add button & script to login FE page
     $wire->addHookAfter('LoginRegisterProLogin::build', function ($event) {
 
         $modules = $this->wire('modules');
@@ -72,7 +71,6 @@ if($modules->isInstalled('LoginRegisterPro')){
         $form->add($markUp);
         $event->return = $form;
     });
-
     // Register a logged in front end user
     $wire->addHookAfter('Page::render', function ($event) {
         $session = $this->wire('session');
@@ -108,5 +106,4 @@ if($modules->isInstalled('LoginRegisterPro')){
             $event->return = $return;
         }
     });
-
 }
