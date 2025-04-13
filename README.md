@@ -121,7 +121,7 @@ The module configuration fields are:
 **Api template** - see `loginpasskey-api-tpl.php` in the `examples` folder. **Changing this template will almost certainly break the application and is unsupported!**
 
 <a id="loginpasskey-in-admin"></a>
-## LoginPassKey in Admin 
+## LoginPassKey in Admin
 When logged into the admin area, a user who is a superuser or has the `passkeys` permission, the page `PassKeys` appears as a child page of `Access`.
 
 Users with this permission can view and/or delete existing passkeys.  The list only shows `id`, `user id`, `username` and date `created`. It does not display any passkey authentication data.
