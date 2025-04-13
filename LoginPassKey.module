@@ -896,7 +896,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         $this->_createTable();
 
-        // TODO create template and template file
         $templates = $this->wire('templates');
         $files = $this->wire('files');
         $pages = $this->wire('pages');
