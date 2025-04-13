@@ -18,10 +18,9 @@ $info = [
     'version' =>' 0.0.2Beta',
     'author' => 'Clip Magic',
     'icon' => 'key',
-    'requires' =>[ "ProcessWire>=3.0.246,", "LoginPassKey"],
+    'requires' =>[ "ProcessWire>=3.0,", "LoginPassKey"],
 
-    // TODO update link to modules directory
-    'href' => 'https://processwire.com/modules/process-hello/',
+    'href' => 'https://processwire.com/modules/login-pass-key/',
     'permission' => 'passkeys',
     'permissions' => [
         'passkeys' => 'Add or remove passkeys'
