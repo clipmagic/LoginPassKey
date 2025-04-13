@@ -5,14 +5,19 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e69aaa26-14a0-4a52-8512-ecd089f971ab" name="Changes" comment="updated">
-      <change beforePath="$PROJECT_DIR$/ProcessLoginPassKey.info.php" beforeDir="false" afterPath="$PROJECT_DIR$/ProcessLoginPassKey.info.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LoginPassKey.module" beforeDir="false" afterPath="$PROJECT_DIR$/LoginPassKey.module" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/loginpasskey-api-tpl.php" beforeDir="false" afterPath="$PROJECT_DIR$/examples/loginpasskey-api-tpl.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lpk-api.php" beforeDir="false" afterPath="$PROJECT_DIR$/lpk-api.php" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="ComposerSettings">
+  <component name="ComposerSettings" synchronizationState="SYNCHRONIZE">
+    <pharConfigPath>$PROJECT_DIR$/composer.json</pharConfigPath>
     <execution />
   </component>
   <component name="Git.Merge.Settings">
@@ -42,7 +47,14 @@
     &quot;accountId&quot;: &quot;e7c8d009-4c25-4a53-8252-496a1b1de7b8&quot;
   }
 }</component>
-  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/opt/homebrew/Cellar/php/8.3.2/bin/php" />
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/opt/homebrew/Cellar/php/8.3.2/bin/php">
+    <include_path>
+      <path value="$PROJECT_DIR$/vendor/composer" />
+    </include_path>
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 1
 }</component>
@@ -88,6 +100,7 @@
       <updated>1743483744338</updated>
       <workItem from="1743483745338" duration="3187000" />
       <workItem from="1743486945856" duration="986000" />
+      <workItem from="1744514682275" duration="3265000" />
     </task>
     <task id="LOCAL-00001" summary="minor update">
       <option name="closed" value="true" />
@@ -201,7 +214,31 @@
       <option name="project" value="LOCAL" />
       <updated>1744503248838</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="updated">
+      <option name="closed" value="true" />
+      <created>1744504083979</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1744504083979</updated>
+    </task>
+    <task id="LOCAL-00016" summary="updated">
+      <option name="closed" value="true" />
+      <created>1744504284888</created>
+      <option name="number" value="00016" />
+      <option name="presentableId" value="LOCAL-00016" />
+      <option name="project" value="LOCAL" />
+      <updated>1744504284888</updated>
+    </task>
+    <task id="LOCAL-00017" summary="updated">
+      <option name="closed" value="true" />
+      <created>1744504394603</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1744504394603</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

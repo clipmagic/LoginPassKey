@@ -191,7 +191,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field = $modules->get('InputfieldText');
         $field->name = 'redirect_url';
         $field->columnWidth	= 50;
-        $field->label = $this->_("Page to redirect to on login (Frontend only)");
+        $field->label = $this->_("Optional: Page to redirect to on login (Frontend only)");
         $field->value = "'/'";
         $field->notes = $this->_("ID or path");
         if(!empty($data['redirect_url']))
@@ -214,6 +214,16 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         $this->wire()->addHookAfter('ProcessWire::ready', function($event) {
             if(!method_exists($event->page, 'render')) {
+
+                // Remove the input->get->logout, when using
+                // LoginRegisterPro to prevent it blocking subsequent passkey logins
+                $user = $this->wire('user');
+                $input = $this->wire('input');
+                $page = $this->wire('page');
+                $session = $this->wire('session');
+                if(!$user->isLoggedIn() && !!$input->get->logout) {
+                    $session->redirect($page->url);
+                }
 
                 if($event->page->template->name === 'admin' && $this->enabledAdmin === 1) {
                     $session = $this->wire('session');

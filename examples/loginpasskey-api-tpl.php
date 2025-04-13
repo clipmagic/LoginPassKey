@@ -95,9 +95,12 @@ if ($post) {
                     if($session->getFor('lpk', 'inadmin')) {
                         $processLogin = $modules->get('ProcessLogin');
                         $processLogin->execute();
+                    } elseif ($modules->isInstalled('LoginRegisterPro')) {
+                        $lrp = $modules->get('LoginRegisterPro');
+                        $lrp->execute();
                     } elseif(!empty($lpkConfig['redirect_url'])) {
                         $session->redirect($page->lpkGetRedirectURL());
-                    };
+                    }
                 }
             }
             break;
