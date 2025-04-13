@@ -192,7 +192,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field->name = 'redirect_url';
         $field->columnWidth	= 50;
         $field->label = $this->_("Optional: Page to redirect to on login (Frontend only)");
-        $field->value = "'/'";
+        $field->value = "";
         $field->notes = $this->_("ID or path");
         if(!empty($data['redirect_url']))
             $field->value = $data['redirect_url'];
