@@ -210,10 +210,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function init() : void
     {
+
         $this->addHookAfter('Page::render', $this, 'addScriptsFE');
 
         $this->wire()->addHookAfter('ProcessWire::ready', function($event) {
             if(!method_exists($event->page, 'render')) {
+                // module & database need to be in place before going further
+                if($event->page->rootParent->name === 'module') return;
 
                 // Remove the input->get->logout, when using
                 // LoginRegisterPro to prevent it blocking subsequent passkey logins
