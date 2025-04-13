@@ -109,7 +109,7 @@ The module configuration fields are:
 - **Identify user by username or email** (required) - defaults to the user template name field. After saving and the user template has email fields, those fields will become available. When choosing an email field, the user may login with their passkey with either their username OR email address in the input field.
 - **User roles permitted to use WebAuthn** (required) - Select all roles for all users. Superuser role MUST be selected to enable Superusers to log in with a passkey. The permission is not set by default.
 - **Path to your API ENDPOINT** (required) - The module will create a template and page for the api by default. Change this path should you prefer another endpoint.
-- **Page to redirect to after login (Frontend only)** - ID or path to redirect to after logging into the front end, eg with LoginRegisterPro.
+- **Page to redirect to after login (Frontend only)** - ID or path to redirect to after logging into the front end when not handled by LoginRegisterPro.
 
 <a id="customising-the-frontend"></a>
 ## Customising the frontend
