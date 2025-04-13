@@ -985,7 +985,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             "modified DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " .
             "PRIMARY KEY (id), " .
             "INDEX user_id_index (user_id) " .
- //           "INDEX credential_id_index (user_id) " .
             ")";
 
         $db = $this->getDatabase();
