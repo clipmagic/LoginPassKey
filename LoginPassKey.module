@@ -1,12 +1,6 @@
 <?php
 namespace ProcessWire;
 
-use CBOR;
-//use CBOR\Decoder;
-//use CBOR\StringStream;
-
-require __DIR__ . '/vendor/autoload.php';
-
 /**
  * WebAuthn for ProcessWire Frontend Users
  *
