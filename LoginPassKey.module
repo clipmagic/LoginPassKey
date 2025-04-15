@@ -641,16 +641,19 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             )
         SQL;
 
+
+        // assign value to the bound params
+        $userId = $user->id;
+        $credentialId = $created->credentialId;
+        $publicKey = $created->publicKey;
+
         $query = $db->prepare($sql);
         $query->bindParam(":user_id", $userId);
         $query->bindParam(":credential_id", $credentialId);
         $query->bindParam(":public_key", $publicKey);
         $query->closeCursor();
 
-        // assign value to the bound params
-        $userId = $user->id;
-        $credentialId = $created->credentialId;
-        $publicKey = $created->publicKey;
+
         $output = $query->execute() ? true : false;
         return $output;
     }
