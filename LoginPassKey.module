@@ -22,7 +22,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 {
     public $transports = ['hybrid', 'internal'];
 
-//    public $attestationFormat = 'none';
     public $attestationFormat = 'none';
 
     public $userVerification = 'preferred';
@@ -32,21 +31,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     public $userDisplayName = null;
 
     public $crossPlatformAttachment = null;
-/*
- *  Moved to LoginPassKey.info.php
-    static public function getModuleInfo()
-    {
-        return [
-            'title' => 'Login with a PassKey for ProcessWire',
-            'author' => 'Clip magic',
-            'version' => '0.0.1',
-            'summary' => 'ProcessWire module that enables login via a passkey',
-            'autoload' => true,
-            'singular' => true,
-            'requires' => ["PHP>=8.1", "ProcessWire>=3.0"]
-        ];
-    }
-*/
 
     public function getModuleConfigInputfields(array $data)
     {
@@ -268,25 +252,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     }
 
-    public function testCBOR($authData)
-    {
-        $decoder = CBOR\Decoder::create();
-
-
-        // CBOR object (in hex for the example)
-        $databin = bin2hex($authData);
-        $datahex = hex2bin($databin);
-
-        // String Stream
-        $stream = CBOR\StringStream::create($datahex);
-
-        // Load the data
-        $object = $decoder->decode($stream); // Return a CBOR\OtherObject\DoublePrecisionFloatObject class with normalized value ~0.3333 (1/3)
-
-        //bd($object, 'decoded cbor object');
-        echo $object;
-
-    }
     #---------------------
     # Hooks
     #---------------------
