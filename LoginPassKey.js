@@ -12,6 +12,7 @@ let lpk = {
     action: async (url, fwd= null) => {
 
         const encoder = new TextEncoder()
+        const decoder = new TextDecoder()
         let authenticatorAttestationResponse
         let cred
         let result
@@ -80,17 +81,18 @@ let lpk = {
                 let pk = fwd.data.pk
 
                 pk.publicKey.user.id  = encoder.encode(pk.publicKey.user.id ).buffer;
-                pk.publicKey.challenge  = hex2bin(pk.publicKey.challenge)
+                pk.publicKey.challenge  = encoder.encode(pk.publicKey.challenge).buffer
+
                 if(pk.publicKey.excludeCredentials.length > 0) {
                     pk.publicKey.excludeCredentials.forEach(c => {
-                        c.id = hex2bin(c.id)
+                        c.id = encoder.encode(c.id).buffer
                         return c
                     });
                 }
                 //create credentials
                 try {
-                    cred = await navigator.credentials.create(pk);
-               } catch (err) {
+                    cred = await navigator.credentials.create(pk)
+                } catch (err) {
                    if (err instanceof DOMException) {
                        console.log('Create action cancelled')
                    }
@@ -99,15 +101,18 @@ let lpk = {
                     // Credentials created
                     authenticatorAttestationResponse = {
                         transports: cred.response.getTransports ? cred.response.getTransports() : null,
-                        clientDataJSON: cred.response.clientDataJSON ? arrayBufferToBase64(cred.response.clientDataJSON) : null,
-                        attestationObject: cred.response.attestationObject ? arrayBufferToBase64(cred.response.attestationObject) : null,
+                        clientDataJSON: cred.response.clientDataJSON ? credToJSON(cred.response.clientDataJSON) : null,
+                        attestationObject: cred.response.attestationObject ? credToJSON(cred.response.attestationObject) : null,
                     }
+                    let pkey = cred.response.getPublicKey() ? credToJSON(cred.response.getPublicKey()) : null;
                     data = {
                         fn: 'register',
                         next: 'end',
                         aarcreate: authenticatorAttestationResponse,
+                        pkey: pkey,
                         errno: 101
                     }
+
                 } else {
                     data = {
                         fn: 'register',
@@ -130,8 +135,7 @@ let lpk = {
 
             case 'verify':
                 let va = fwd.data.verifyArgs
-
-                va.publicKey.challenge  = hex2bin(va.publicKey.challenge);
+                va.publicKey.challenge  = encoder.encode(va.publicKey.challenge).buffer;
                 va.publicKey.allowCredentials = []
 
                 //get credentials
@@ -146,16 +150,19 @@ let lpk = {
                 if(cred) {
                     //create object for transmission to server
                     let authenticatorAttestationResponse = {
-                        id: cred.rawId ? arrayBufferToBase64(cred.rawId) : null,
-                        clientDataJSON: cred.response.clientDataJSON ? arrayBufferToBase64(cred.response.clientDataJSON) : null,
-                        authenticatorData: cred.response.authenticatorData ? arrayBufferToBase64(cred.response.authenticatorData) : null,
-                        signature: cred.response.signature ? arrayBufferToBase64(cred.response.signature) : null,
-                        userHandle: cred.response.userHandle ? arrayBufferToBase64(cred.response.userHandle) : null
+                        id: cred.rawId ? credToJSON(cred.rawId) : null,
+                        clientDataJSON: cred.response.clientDataJSON ? credToJSON(cred.response.clientDataJSON) : null,
+                        authenticatorData: cred.response.authenticatorData ? credToJSON(cred.response.authenticatorData) : null,
+                        signature: cred.response.signature ? credToJSON(cred.response.signature) : null,
+                        userHandle: cred.response.userHandle ? credToJSON(cred.response.userHandle) : null,
+                        challenge: credToJSON(va.publicKey.challenge)
                     }
+
                     data = {
                         fn: "verify",
                         next: "end",
                         aarverify: authenticatorAttestationResponse,
+//                        challenge: credToJSON(va.publicKey.challenge),
                         errno: 101
                     }
 
@@ -253,6 +260,10 @@ function arrayBufferToBase64(buffer) {
         binary += String.fromCharCode( bytes[ i ] );
     }
     return window.btoa(binary);
+}
+
+function credToJSON(item) {
+    return JSON.parse(JSON.stringify(arrayBufferToBase64(item)));
 }
 
 function hex2bin(hex) {

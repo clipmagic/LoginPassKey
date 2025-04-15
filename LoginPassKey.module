@@ -1,6 +1,12 @@
 <?php
 namespace ProcessWire;
 
+use CBOR;
+//use CBOR\Decoder;
+//use CBOR\StringStream;
+
+require __DIR__ . '/vendor/autoload.php';
+
 /**
  * WebAuthn for ProcessWire Frontend Users
  *
@@ -22,6 +28,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 {
     public $transports = ['hybrid', 'internal'];
 
+//    public $attestationFormat = 'none';
     public $attestationFormat = 'none';
 
     public $userVerification = 'preferred';
@@ -191,8 +198,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field = $modules->get('InputfieldText');
         $field->name = 'redirect_url';
         $field->columnWidth	= 50;
-        $field->label = $this->_("Optional: Page to redirect to on login (Frontend only)");
-        $field->value = "";
+        $field->label = $this->_("Page to redirect to on login (Frontend only)");
+        $field->value = "'/'";
         $field->notes = $this->_("ID or path");
         if(!empty($data['redirect_url']))
             $field->value = $data['redirect_url'];
@@ -210,7 +217,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function init() : void
     {
-
         $this->addHookAfter('Page::render', $this, 'addScriptsFE');
 
         $this->wire()->addHookAfter('ProcessWire::ready', function($event) {
@@ -267,6 +273,26 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
 
     }
+
+    public function testCBOR($authData)
+    {
+        $decoder = CBOR\Decoder::create();
+
+
+        // CBOR object (in hex for the example)
+        $databin = bin2hex($authData);
+        $datahex = hex2bin($databin);
+
+        // String Stream
+        $stream = CBOR\StringStream::create($datahex);
+
+        // Load the data
+        $object = $decoder->decode($stream); // Return a CBOR\OtherObject\DoublePrecisionFloatObject class with normalized value ~0.3333 (1/3)
+
+        //bd($object, 'decoded cbor object');
+        echo $object;
+
+    }
     #---------------------
     # Hooks
     #---------------------
@@ -290,7 +316,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function lpkGetApiHttpUrl(HookEvent $event)
     {
-        $event->return = 'https://' . $this->rp  .  $this->api_url;
+        $event->return = $this->getApiHttpUrl();
     }
 
     public function lpkGetArgs(HookEvent $event)
@@ -320,7 +346,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         $user = $event->arguments(0);
         $dn = $event->arguments(1);
-        $event->return = $this->registerUser($user, $dn);
+        $pkey = $event->arguments(2);
+        $event->return = $this->registerUser($user, $dn, $pkey);
     }
 
     public function lpkVerify(HookEvent $event)
@@ -376,14 +403,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     }
 
     public function registerAdmin(HookEvent $event) {
-        bd('user logged into admin');
 
         // Register a logged in front end user
         $session = $this->wire('session');
 
         $user = $this->wire('user');
         $lpk = $this->wire('modules')->get('LoginPassKey');
-        $modConfig = wire('modules')->getConfig('LoginPassKey');
+        $modConfig = wire('modules')->getConfig($this);
         $apiUrl = $modConfig['api_url'];
 
         $allowed = false;
@@ -418,6 +444,10 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
     }
 
+    public function getApiHttpUrl()
+    {
+        return 'https://' . $this->rp  .  $this->api_url;
+    }
 
 
     public function getDatabase()
@@ -467,7 +497,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         // Scenario 3
         if($feUser instanceof NullPage) {
         //    $output->id = $feUser->id;
-            bd($feUser);
 
             $output->msg = $this->getErrorMessage(65) . $username;
             $output->errno = 65;
@@ -582,7 +611,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                 $query->closeCursor();
                 $query->execute();
                 $result = $query->fetchAll(\PDO::FETCH_ASSOC);
-                //bd($user->id);
                 return (int) $result[0]["COUNT(user_id)"];
             }
         } catch (WireException $e) {
@@ -594,7 +622,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         try {
             $db = wire('database');
-            $sql = "SELECT `credential_id` from " . $this->getTableName() . " where user_id=" . $user->id;
+            $sql = "SELECT `credential_id`, `public_key` from " . $this->getTableName() . " where user_id=" . $user->id;
             $query = $db->prepare($sql);
             $query->closeCursor();
             $query->execute();
@@ -643,23 +671,27 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             INSERT INTO {$this->getTableName()}
             (
              user_id, 
-             credential_id
+             credential_id,
+             public_key
              ) 
             VALUES 
             ( 
              :user_id,
-             :credential_id
+             :credential_id,
+             :public_key
             )
         SQL;
 
         $query = $db->prepare($sql);
         $query->bindParam(":user_id", $userId);
         $query->bindParam(":credential_id", $credentialId);
+        $query->bindParam(":public_key", $publicKey);
         $query->closeCursor();
 
         // assign value to the bound params
         $userId = $user->id;
         $credentialId = $created->credentialId;
+        $publicKey = $created->publicKey;
         $output = $query->execute() ? true : false;
         return $output;
     }
@@ -746,13 +778,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     return $args;
     }
 
-    public function registerUser($user, $credData)
+    public function registerUser($user, $credData, $publicKey)
     {
         $clientDataJSON = $this->base64url_decode($credData->clientDataJSON);
-        $this->processCreate($user, $clientDataJSON);
+        $this->processCreate($user, $clientDataJSON, $publicKey);
     }
 
-    public function processCreate($user, $clientDataJSON)
+    public function processCreate($user, $clientDataJSON, $publicKey)
     {
         $data = new \stdClass();
 
@@ -767,6 +799,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $toDB = new \stdClass();
         $toDB->user_id = $user->id;
         $toDB->credentialId = $clientData->challenge;
+        $toDB->publicKey = $publicKey;
 
         try {
             $this->_saveCredentialToDB($toDB);
@@ -784,6 +817,18 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function verifyUser($user) {
 
+        $allowCredentials = [];
+        $existingCredentials = $this->_getCredentialsFromDB($user);
+        if(\count($existingCredentials) > 0) {
+            foreach($existingCredentials as $credential) {
+                $obj = new \stdClass();
+                $obj->id = $credential['credential_id'];
+                $obj->type = "public-key";
+                $allowCredentials[] = $obj;
+            }
+        }
+
+
         $lpkArgs = $this->getlpkargs();
 
         $output = new \stdClass();
@@ -792,6 +837,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $output->publicKey->challenge = $this->_createChallenge();  // binary
         $output->publicKey->userVerification = $this->userVerification;
         $output->publicKey->rpId = $lpkArgs->rp;
+        $output->publicKey->authenticatorSelection = new \stdClass();
+        if(!empty($allowCredentials))
+            $output->publicKey->allowCredentials = $allowCredentials;
         return $output;
     }
 
@@ -803,12 +851,30 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $output->errno = 4;
         $output->next = 'end';
 
+        $sanitizer = $this->wire('sanitizer');
+        $session = $this->wire('session');
+
+        $userid = $sanitizer->int($session->getFor('lpk', 'userid'));
+        $feUser = $this->wire('users')->get($userid);
+
+        $userPassKeys = $this->_getCredentialsFromDB($feUser);
+
+        if(\count($userPassKeys) < 1)
+            return $output;
+
         if(!empty($authenticatorAttestationResponse)) {
-            $sanitizer = $this->wire('sanitizer');
-            $session = $this->wire('session');
+
+            $getArgs = $this->getlpkargs();
+            $clientDataJSON = $this->base64url_decode($authenticatorAttestationResponse->clientDataJSON);
+            $clientData = \json_decode($clientDataJSON);
+
+            if(!$clientData || $clientData->origin !== "https://" . $getArgs->rp)
+                return $output;
+
+            if(rtrim($authenticatorAttestationResponse->challenge, "=") !== $clientData->challenge)
+                return $output;
 
             $userHandle = $sanitizer->int($this->base64url_decode($authenticatorAttestationResponse->userHandle));
-            $userid = $sanitizer->int($session->getFor('lpk', 'userid'));
 
             if ($userid === $userHandle) {
                 $session->setFor('lpk', 'success', 'success');
@@ -983,6 +1049,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             "id INT(10) NOT NULL AUTO_INCREMENT, " .
             "user_id INT(10) UNSIGNED NOT NULL, " .
             "credential_id TEXT NOT NULL UNIQUE, " .
+            "public_key TEXT NOT NULL UNIQUE, " .
             "created DATETIME DEFAULT CURRENT_TIMESTAMP, " .
             "modified DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " .
             "PRIMARY KEY (id), " .

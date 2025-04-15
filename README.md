@@ -42,7 +42,7 @@ In short, passkeys offer improved security and convenience compared to tradition
 <a id="features"></a>
 ## Features
 - Can be enabled for Frontend users only, Admin users only, or both
-- Has no dependencies. Simply install, then configure the module and it's good to go
+- Simply install, then configure the module and it's good to go
 - The module does not require TFA and will probably conflict if TFA is installed
 - The module does not make any changes to the user template
 
@@ -109,14 +109,13 @@ The module configuration fields are:
 - **Identify user by username or email** (required) - defaults to the user template name field. After saving and the user template has email fields, those fields will become available. When choosing an email field, the user may login with their passkey with either their username OR email address in the input field.
 - **User roles permitted to use WebAuthn** (required) - Select all roles for all users. Superuser role MUST be selected to enable Superusers to log in with a passkey. The permission is not set by default.
 - **Path to your API ENDPOINT** (required) - The module will create a template and page for the api by default. Change this path should you prefer another endpoint.
-- **Page to redirect to after login (Frontend only)** - ID or path to redirect to after logging into the front end when not handled by LoginRegisterPro.
 
 <a id="customising-the-frontend"></a>
 ## Customising the frontend
 
 **Frontend page template** - see `loginpasskey-page-tpl.php` in the `examples` folder. The script MUST be present but the layout can be whatever you choose. The id attribute of the button MUST match the `getElementById` selector.
 
-**LoginPassKey with LoginRegisterPro** - Copy/paste the content of `loginpassk-for-loginregisterpro-hook` in the `examples` folder into your `site/ready.php` file to add support for LoginRegisterPro
+**LoginPassKey with LoginRegisterPro** - Coming soon
 
 **Api template** - see `loginpasskey-api-tpl.php` in the `examples` folder. **Changing this template will almost certainly break the application and is unsupported!**
 
@@ -132,7 +131,7 @@ If `Enable Admin Passkey login` is checked, users with this permission can also 
 ## Credit where it's due
 This module would not be possible without the help and support from:
 
-- Ryan Cramer for ProcessWire (duh!) and his comprehensive ProcessWire docs
+- Ryan Cramer for ProcessWire and his comprehensive ProcessWire docs
 - The ProcessWire Community Forum, with special mentions to:
    - Adrian for his TracyDebugger module and quick replies when I reached out for help
    - Bernhard for his knowledge and who is always willing to help

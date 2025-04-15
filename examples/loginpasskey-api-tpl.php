@@ -18,6 +18,7 @@ $post = trim(file_get_contents('php://input'));
 
 if ($post) {
     $data = \json_decode($post, null, 512, 0);
+
     $next = $input->urlSegment(1);
     $lpkData = new \stdClass();
     $lpkData->data = $data;
@@ -61,7 +62,7 @@ if ($post) {
             $lpkData->data = new \stdClass();
             $lpkData->data->next = $data->next;
             if(!empty($data->aarcreate)) {
-                $created = $page->lpkRegisterUser($user, $data->aarcreate);
+                $created = $page->lpkRegisterUser($user, $data->aarcreate, $data->pkey);
                 if(!!$created) {
                     $session->setFor('lpk', 'success', 'success');
                     $session->removeFor('lpk', 'username');
@@ -84,6 +85,7 @@ if ($post) {
 
             } else {
                 $verified = $page->lpkVerifyResponse($data->aarverify);
+
                 $lpkData->data = $verified;
                 if ($verified->errno === 101) {
                     $lpkData->msg = $page->lpkGetErrorMessage(101);
@@ -95,12 +97,9 @@ if ($post) {
                     if($session->getFor('lpk', 'inadmin')) {
                         $processLogin = $modules->get('ProcessLogin');
                         $processLogin->execute();
-                    } elseif ($modules->isInstalled('LoginRegisterPro')) {
-                        $lrp = $modules->get('LoginRegisterPro');
-                        $lrp->execute();
                     } elseif(!empty($lpkConfig['redirect_url'])) {
                         $session->redirect($page->lpkGetRedirectURL());
-                    }
+                    };
                 }
             }
             break;
