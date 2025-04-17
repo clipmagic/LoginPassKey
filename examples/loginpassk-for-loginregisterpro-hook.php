@@ -1,11 +1,13 @@
 <?php namespace ProcessWire;
 
 // LoginPassKey with LoginRegisterPro
-if($modules->isInstalled('LoginRegisterPro')){
+if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPassKey')) {
     // Add button & script to login FE page
     $wire->addHookAfter('LoginRegisterProLogin::build', function ($event) {
 
-        $modules = $this->wire('modules');
+        $modules = wire('modules');
+        $lpk = $modules->get('LoginPassKey');
+
         $modConfig = $modules->getConfig('LoginPassKey');
         $apiUrl = $modConfig['api_url'];
         $redirectUrl = $modConfig['redirect_url'];
@@ -16,7 +18,7 @@ if($modules->isInstalled('LoginRegisterPro')){
         $passkeyButton = wire('modules')->get('InputfieldButton');
         $passkeyButton->attr('id+name', 'lpk');
         $passkeyButton->addClass('top_button');
-        $passkeyButton->attr('value', $this->_("Login with PassKey"));
+        $passkeyButton->attr('value', $lpk->_("Login with PassKey"));
         $passkeyButton->icon = 'key';
         $passkeyButton->attr('href', '#');
         $form->add($passkeyButton);
@@ -71,6 +73,7 @@ if($modules->isInstalled('LoginRegisterPro')){
         $form->add($markUp);
         $event->return = $form;
     });
+
     // Register a logged in front end user
     $wire->addHookAfter('Page::render', function ($event) {
         $session = $this->wire('session');
@@ -93,7 +96,7 @@ if($modules->isInstalled('LoginRegisterPro')){
             $data->next = 'register';
 
             $fwd->data = $data;
-            $fwdJSON = json_encode($fwd);
+            $fwdJSON = \json_encode($fwd);
 
             $js  = "<script>";
             $js .= "let apiUrl = '$apiUrl'\n";

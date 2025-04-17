@@ -212,7 +212,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                     $session->redirect($page->url);
                 }
 
-                if($event->page->template->name === 'admin' && $this->enabledAdmin === 1) {
+                if($event->page->template->name === 'admin' && $this->enabledAdmin === 1 ) {
                     $session = $this->wire('session');
                     $session->setFor('lpk', 'inadmin', 1);
                     $event->page->addHookBefore('render', function ($event) {
@@ -305,8 +305,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         $user = $event->arguments(0);
         $dn = $event->arguments(1);
-        $pkey = $event->arguments(2);
-        $event->return = $this->registerUser($user, $dn, $pkey);
+        $event->return = $this->registerUser($user, $dn);
     }
 
     public function lpkVerify(HookEvent $event)
@@ -317,8 +316,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function lpkVerifyResponse(HookEvent $event)
     {
-        $authenticatorResponse = $event->arguments(0);
-        $event->return = $this->verifyResponse($authenticatorResponse);
+        $credData = $event->arguments(0);
+        $challenge = $event->arguments(1);
+        $event->return = $this->verifyResponse($credData, $challenge);
     }
 
     // lpk only hooks
@@ -641,20 +641,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             )
         SQL;
 
-
-        // assign value to the bound params
-        $userId = $user->id;
-        $credentialId = $created->credentialId;
-        $publicKey = $created->publicKey;
-
         $query = $db->prepare($sql);
-        $query->bindParam(":user_id", $userId);
-        $query->bindParam(":credential_id", $credentialId);
-        $query->bindParam(":public_key", $publicKey);
+        $query->bindParam(":user_id", $user->id);
+        $query->bindParam(":credential_id", $created->credentialId);
+        $query->bindParam(":public_key", $created->publicKey);
         $query->closeCursor();
-
-
         $output = $query->execute() ? true : false;
+
         return $output;
     }
 
@@ -740,33 +733,26 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     return $args;
     }
 
-    public function registerUser($user, $credData, $publicKey)
-    {
-        $clientDataJSON = $this->base64url_decode($credData->clientDataJSON);
-        $this->processCreate($user, $clientDataJSON, $publicKey);
-    }
-
-    public function processCreate($user, $clientDataJSON, $publicKey)
+    public function registerUser($user, $credData = null)
     {
         $data = new \stdClass();
+        // finish up after regardless of outcome
+        $data->next = 'end';
 
-        if(is_null($clientDataJSON) ) {
-            $data->error = 3;
-            $data->next = 'end';
+        if(is_null($credData)) {
+            $data->errno = 3;
+            $data->msg = $this->getErrorMessage(3);
             return $data;
         }
 
-        $clientData = \json_decode($clientDataJSON);
-
         $toDB = new \stdClass();
         $toDB->user_id = $user->id;
-        $toDB->credentialId = $clientData->challenge;
-        $toDB->publicKey = $publicKey;
+        $toDB->credentialId = $credData->id;
+        $toDB->publicKey = $credData->response->publicKey;
 
         try {
-            $this->_saveCredentialToDB($toDB);
-            $data->created = true;
-//            $data->msg = $this->_('Successfully registered.');
+//            $this->_saveCredentialToDB($toDB);
+            $data->created = $this->_saveCredentialToDB($toDB);
             $data->msg = $this->getErrorMessage(102);
             $data->errno = 102;
         } catch(WireException $e) {
@@ -774,6 +760,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $data->created = false;
             $data->error = $this->getErrorMessage(2);
         }
+        bd($data);
         return $data;
     }
 
@@ -805,8 +792,12 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return $output;
     }
 
-    public function verifyResponse($authenticatorAttestationResponse = null)
+//    public function verifyResponse($authenticatorAttestationResponse = null, $challenge = null)
+    public function verifyResponse($credData = null, $challenge = null)
     {
+        bd($credData, 'credData');
+        bd($challenge, 'challenge');
+
         $output = new \stdClass();
         $output->fn = 'verify';
         $output->msg = $this->getErrorMessage(4);
@@ -819,24 +810,42 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $userid = $sanitizer->int($session->getFor('lpk', 'userid'));
         $feUser = $this->wire('users')->get($userid);
 
+        // user passkey saved in DB
         $userPassKeys = $this->_getCredentialsFromDB($feUser);
-
+        // no saved passkeys
         if(\count($userPassKeys) < 1)
             return $output;
 
-        if(!empty($authenticatorAttestationResponse)) {
+        // did not get credentials data from the device
+        if(!empty($credData)) {
 
             $getArgs = $this->getlpkargs();
-            $clientDataJSON = $this->base64url_decode($authenticatorAttestationResponse->clientDataJSON);
+            $clientDataJSON = $this->base64url_decode($credData->response->clientDataJSON);
+
+            // no clientdatajson from the device
             $clientData = \json_decode($clientDataJSON);
-
-            if(!$clientData || $clientData->origin !== "https://" . $getArgs->rp)
+            if(!$clientData)
                 return $output;
 
-            if(rtrim($authenticatorAttestationResponse->challenge, "=") !== $clientData->challenge)
+            // relying party hosts don't match
+            if($clientData->origin !== "https://" . $getArgs->rp)
                 return $output;
 
-            $userHandle = $sanitizer->int($this->base64url_decode($authenticatorAttestationResponse->userHandle));
+            // challenges dont match
+            $clientChallenge = \rtrim($challenge, "=");
+            if($clientChallenge !== $clientData->challenge)
+                return $output;
+
+
+bd($credData->response->authenticatorData, 'authData ');
+
+$clientDataHash = \hash('sha256', $clientDataJSON, false);
+bd($clientDataHash, 'hashed clientDataJSON');
+
+bd(\rtrim($userPassKeys[0]['public_key'], '='), 'user public key');
+
+            // now check the user id's match
+            $userHandle = $sanitizer->int($this->base64url_decode($credData->response->userHandle));
 
             if ($userid === $userHandle) {
                 $session->setFor('lpk', 'success', 'success');

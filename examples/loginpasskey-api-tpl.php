@@ -60,20 +60,23 @@ if ($post) {
         case 'register':
             // logged in and eligible to register for WebAuthn
             $lpkData->data = new \stdClass();
-            $lpkData->data->next = $data->next;
+
             if(!empty($data->aarcreate)) {
-                $created = $page->lpkRegisterUser($user, $data->aarcreate, $data->pkey);
+                $created = $page->lpkRegisterUser($user, $data->aarcreate);
+
+                bd($created, 'created');
+
                 if(!!$created) {
                     $session->setFor('lpk', 'success', 'success');
                     $session->removeFor('lpk', 'username');
-                    $lpkData->data->msg = $data->msg;
-
+                    $lpkData = $created;
                 }
             } else {
-                $lpkData->data->msg = $page->lpkGetErrorMessage(2);
-                $lpkData->data->errno = 2;
+                $lpkData->msg = $page->lpkGetErrorMessage(2);
+                $lpkData->errno = 2;
             }
-            return \json_encode($data);
+            bd($lpkData, 'lpkData in register');
+            return \json_encode($lpkData);
             break;
 
         case 'verify':
@@ -84,7 +87,7 @@ if ($post) {
                 $lpkData->data->next = 'end';
 
             } else {
-                $verified = $page->lpkVerifyResponse($data->aarverify);
+                $verified = $page->lpkVerifyResponse($data->aarverify, $data->challenge);
 
                 $lpkData->data = $verified;
                 if ($verified->errno === 101) {

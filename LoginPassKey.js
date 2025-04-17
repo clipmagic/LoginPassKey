@@ -89,6 +89,7 @@ let lpk = {
                         return c
                     });
                 }
+
                 //create credentials
                 try {
                     cred = await navigator.credentials.create(pk)
@@ -97,28 +98,19 @@ let lpk = {
                        console.log('Create action cancelled')
                    }
                }
+
                 if(cred) {
-                    // Credentials created
-                    authenticatorAttestationResponse = {
-                        transports: cred.response.getTransports ? cred.response.getTransports() : null,
-                        clientDataJSON: cred.response.clientDataJSON ? credToJSON(cred.response.clientDataJSON) : null,
-                        attestationObject: cred.response.attestationObject ? credToJSON(cred.response.attestationObject) : null,
-                    }
-                    let pkey = cred.response.getPublicKey() ? credToJSON(cred.response.getPublicKey()) : null;
                     data = {
                         fn: 'register',
                         next: 'end',
-                        aarcreate: authenticatorAttestationResponse,
-                        pkey: pkey,
-                        errno: 101
+                        aarcreate: await cred.toJSON()
                     }
 
                 } else {
                     data = {
                         fn: 'register',
                         next: 'end',
-                        aarcreate: null,
-                        errno: 2
+                        aarcreate: null
                     }
                 }
                 // Progress to the next step in the process
@@ -127,7 +119,7 @@ let lpk = {
                 return await connectPost(data,url)
                     .then(
                         (res) => {
-                            if(res.end) return res
+                            if(res && res.end) return res
                             return lpk.action(`${apiUrl}${data.next}`,res)
                         }
                     )
@@ -137,6 +129,7 @@ let lpk = {
                 let va = fwd.data.verifyArgs
                 va.publicKey.challenge  = encoder.encode(va.publicKey.challenge).buffer;
                 va.publicKey.allowCredentials = []
+
 
                 //get credentials
                 try {
@@ -148,21 +141,11 @@ let lpk = {
                 }
 
                 if(cred) {
-                    //create object for transmission to server
-                    let authenticatorAttestationResponse = {
-                        id: cred.rawId ? credToJSON(cred.rawId) : null,
-                        clientDataJSON: cred.response.clientDataJSON ? credToJSON(cred.response.clientDataJSON) : null,
-                        authenticatorData: cred.response.authenticatorData ? credToJSON(cred.response.authenticatorData) : null,
-                        signature: cred.response.signature ? credToJSON(cred.response.signature) : null,
-                        userHandle: cred.response.userHandle ? credToJSON(cred.response.userHandle) : null,
-                        challenge: credToJSON(va.publicKey.challenge)
-                    }
-
                     data = {
                         fn: "verify",
                         next: "end",
-                        aarverify: authenticatorAttestationResponse,
-//                        challenge: credToJSON(va.publicKey.challenge),
+                        aarverify: await cred.toJSON(),
+                        challenge:  credToJSON(va.publicKey.challenge),
                         errno: 101
                     }
 
@@ -221,7 +204,9 @@ let lpk = {
 
     // used when user logged in to create a new passkey
     registerOnly: async (apiUrl, data) => {
-        await lpk.action(`${apiUrl}register`, data).then (res => {
+        data.fn = 'register'
+        data.end = 'end'
+        return await lpk.action(`${apiUrl}register`, data).then (res => {
         })
     }
 }
@@ -243,6 +228,32 @@ const connectPost = async (data, url) => {
         console.log('Error fetching post request data:', `${error.message} in ${body}`);
         console.log('data:', data);
         console.log('url:', url);
+    }
+}
+
+
+function recursiveBase64StrToArrayBuffer(obj) {
+    let prefix = '=?BINARY?B?';
+    let suffix = '?=';
+    if (typeof obj === 'object') {
+        for (let key in obj) {
+            if (typeof obj[key] === 'string') {
+                let str = obj[key];
+                if (str.substring(0, prefix.length) === prefix && str.substring(str.length - suffix.length) === suffix) {
+                    str = str.substring(prefix.length, str.length - suffix.length);
+
+                    let binary_string = window.atob(str);
+                    let len = binary_string.length;
+                    let bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++)        {
+                        bytes[i] = binary_string.charCodeAt(i);
+                    }
+                    obj[key] = bytes.buffer;
+                }
+            } else {
+                recursiveBase64StrToArrayBuffer(obj[key]);
+            }
+        }
     }
 }
 
