@@ -2,7 +2,7 @@
 namespace ProcessWire;
 
 /**
- * WebAuthn for ProcessWire Frontend Users
+ * WebAuthn for ProcessWire Users
  *
  * Copyright:
  *
@@ -22,6 +22,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 {
     public $transports = ['hybrid', 'internal'];
 
+//    public $attestationFormat = 'none';
     public $attestationFormat = 'none';
 
     public $userVerification = 'preferred';
@@ -212,13 +213,18 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                     $session->redirect($page->url);
                 }
 
-                if($event->page->template->name === 'admin' && $this->enabledAdmin === 1 ) {
+                if($event->page->template->name === 'admin') {
+                    $config = $this->wire('config');
+                    $config->styles->add($config->urls($this) . $this->className() . ".css");
+                }
+
+                if($event->page->template->name === 'admin' && $this->enabledAdmin === 1) {
                     $session = $this->wire('session');
                     $session->setFor('lpk', 'inadmin', 1);
                     $event->page->addHookBefore('render', function ($event) {
                         $config = $this->wire('config');
                         $config->scripts->add($config->urls($this) . $this->className() . ".js");
-                        $config->scripts->add($config->urls($this) . $this->className() . "Admin.js");
+                            $config->scripts->add($config->urls($this) . $this->className() . "Admin.js");
                     });
 
                     $event->page->addHookAfter('ProcessLogin::buildLoginForm', $this, 'addLoginBtn');
@@ -257,6 +263,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     #---------------------
 
     // Methods added to Page for use in templates
+
     public function lpkFindUser(HookEvent $event)
     {
         $user = $event->arguments(0);
@@ -318,7 +325,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         $credData = $event->arguments(0);
         $challenge = $event->arguments(1);
-        $event->return = $this->verifyResponse($credData, $challenge);
+        $signedData = $event->arguments(2);
+        $event->return = $this->verifyResponse($credData, $challenge, $signedData);
     }
 
     // lpk only hooks
@@ -353,8 +361,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         $html = "<div id='end' class='uk-margin'></div>";
         $modules = $this->wire('modules');
-        $apiUrl = $modules->getConfig('LoginPassKey')['api_url'];
+//        $apiUrl = $modules->getConfig('LoginPassKey')['api_url'];
+
+        $apiUrl = $this->getApiHttpUrl();
+
         $html .= "<script>let apiUrl = '$apiUrl'</script>";
+//        $html .= "if(!apiUrl)";
+//        $html .= "let apiUrl = '$apiUrl'</script>";
         $markUp->value = $html;
         $form->add($markUp);
 
@@ -366,7 +379,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         // Register a logged in front end user
         $session = $this->wire('session');
 
+
         $user = $this->wire('user');
+
         $lpk = $this->wire('modules')->get('LoginPassKey');
         $modConfig = wire('modules')->getConfig($this);
         $apiUrl = $modConfig['api_url'];
@@ -382,20 +397,20 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $fwd = new \stdClass();
             $fwd->fn = 'finduser';
             $fwd->un = $user->name;
+            $fwd->next = 'register';
 
             $data = new \stdClass();
             $data->pk = $lpk->preRegisterUser($user);
             $data->next = 'register';
 
             $fwd->data = $data;
-            $fwdJSON = json_encode($fwd);
+            $fwdJSON = \json_encode($fwd);
 
             $js  = "<script>";
             $js .= "let apiUrl = '$apiUrl'\n";
-            $js .= "lpk.registerOnly(`$apiUrl`, `$fwdJSON`)\n";
+            $js .= "lpk.action(`${apiUrl}register`, $fwdJSON).then(res=> console.log(res))\n";
             $js .= "</script>";
             $return = str_ireplace("</body>", $js . "</body>", $event->return);
-
 
             // regardless of outcome, only run once per session
             $session->setFor('lpk', 'success', 'success');
@@ -625,6 +640,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         // User has to be logged in to get to this point
         $user = $this->wire('user');
         $db = $this->wire('database');
+        $userID = $user->id;
+        $credentialID =$created->credentialId;
 
         $sql = <<<SQL
             INSERT INTO {$this->getTableName()}
@@ -641,14 +658,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             )
         SQL;
 
+        $pem = $this->publicKeyToPem($created->publicKey);
         $query = $db->prepare($sql);
-        $query->bindParam(":user_id", $user->id);
-        $query->bindParam(":credential_id", $created->credentialId);
-        $query->bindParam(":public_key", $created->publicKey);
+        $query->bindParam(":user_id", $userID);
+        $query->bindParam(":credential_id", $credentialID);
+        $query->bindParam(":public_key", $pem);
         $query->closeCursor();
-        $output = $query->execute() ? true : false;
-
-        return $output;
+        return $query->execute() ? true : false;
     }
 
     public function preRegisterUser($user)
@@ -673,7 +689,11 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $args->publicKey->authenticatorSelection->residentKey = $this->residentKey;
         $args->publicKey->authenticatorSelection->requireResidentKey = false;
 
-        $args->publicKey->authenticatorSelection->authenticatorAttachment = $this->crossPlatformAttachment;
+        $crossPlatformAttachment = in_array($this->crossPlatformAttachment, ['platform', 'cross-platform'])
+            ? $this->crossPlatformAttachment
+            : 'platform';
+
+        $args->publicKey->authenticatorSelection->authenticatorAttachment = $crossPlatformAttachment;
 
         // user
         $args->publicKey->user = new \stdClass();
@@ -735,33 +755,36 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function registerUser($user, $credData = null)
     {
-        $data = new \stdClass();
+        $output = new \stdClass();
         // finish up after regardless of outcome
-        $data->next = 'end';
+        $output->next = 'end';
+        $output->msg = $this->getErrorMessage(2);
+        $output->errno = 2;
+
 
         if(is_null($credData)) {
-            $data->errno = 3;
-            $data->msg = $this->getErrorMessage(3);
-            return $data;
+            $output->errno = 3;
+            $output->msg = $this->getErrorMessage(3);
+            return $output;
         }
 
         $toDB = new \stdClass();
         $toDB->user_id = $user->id;
         $toDB->credentialId = $credData->id;
         $toDB->publicKey = $credData->response->publicKey;
-
         try {
-//            $this->_saveCredentialToDB($toDB);
-            $data->created = $this->_saveCredentialToDB($toDB);
-            $data->msg = $this->getErrorMessage(102);
-            $data->errno = 102;
+            $output->created = $this->_saveCredentialToDB($toDB);
+            if($output->created !== false) {
+                $output->msg = $this->getErrorMessage(102);
+                $output->errno = 102;
+            }
         } catch(WireException $e) {
             $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
-            $data->created = false;
-            $data->error = $this->getErrorMessage(2);
+            $output->created = 0;
+            $output->msg = $this->getErrorMessage(2);
+            $output->errno = 2;
         }
-        bd($data);
-        return $data;
+        return $output;
     }
 
     public function verifyUser($user) {
@@ -776,7 +799,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                 $allowCredentials[] = $obj;
             }
         }
-
 
         $lpkArgs = $this->getlpkargs();
 
@@ -793,11 +815,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     }
 
 //    public function verifyResponse($authenticatorAttestationResponse = null, $challenge = null)
-    public function verifyResponse($credData = null, $challenge = null)
+    public function verifyResponse($credData = null, $challenge = null, $signedData = null)
     {
-        bd($credData, 'credData');
-        bd($challenge, 'challenge');
-
         $output = new \stdClass();
         $output->fn = 'verify';
         $output->msg = $this->getErrorMessage(4);
@@ -816,7 +835,20 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         if(\count($userPassKeys) < 1)
             return $output;
 
-        // did not get credentials data from the device
+        $userPassKey = '';
+        foreach($userPassKeys as $passKey) {
+            if($passKey['credential_id'] === $credData->id) {
+                $userPassKey = $passKey;
+                break;
+            }
+        }
+
+        // didn't find a matching passkey
+        if(empty($userPassKey)) {
+            return $output;
+        }
+
+        // got credentials data from the device
         if(!empty($credData)) {
 
             $getArgs = $this->getlpkargs();
@@ -836,18 +868,40 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             if($clientChallenge !== $clientData->challenge)
                 return $output;
 
+            // credential id's don't match
+            if($credData->id !== $userPassKey['credential_id'])
+                return $output;
 
-bd($credData->response->authenticatorData, 'authData ');
+            // device failed to sign the request
+            if(!$credData->response->signature)
+                return $output;
 
-$clientDataHash = \hash('sha256', $clientDataJSON, false);
-bd($clientDataHash, 'hashed clientDataJSON');
+            if (strpos($userPassKey['public_key'], 'BEGIN PUBLIC KEY') === false) {
+                $publicKey = $this->publicKeyToPem($userPassKey['public_key']);
+            } else {
+                $publicKey = $userPassKey['public_key'];
+            }
 
-bd(\rtrim($userPassKeys[0]['public_key'], '='), 'user public key');
+            $signedData = $this->base64url_decode($signedData);
+            $signature = $this->base64url_decode($credData->response->signature);
+
+            $key = openssl_pkey_get_public($publicKey);
+
+            if (!$key) {
+                return $output;
+            } else {
+                $isValid = openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
+//                bd($isValid, 'isValid');
+//                bd(\openssl_error_string(), 'error msg');
+                if(!$isValid === 1) {
+                    return $output;
+                }
+            }
 
             // now check the user id's match
             $userHandle = $sanitizer->int($this->base64url_decode($credData->response->userHandle));
 
-            if ($userid === $userHandle) {
+            if ($userid === $userHandle && $isValid === 1) {
                 $session->setFor('lpk', 'success', 'success');
                 $output->msg = $this->getErrorMessage(101);
                 $output->errno = 101;
@@ -923,9 +977,33 @@ bd(\rtrim($userPassKeys[0]['public_key'], '='), 'user public key');
         }
     }
 
+
     public function base64url_decode($data)
     {
-        return base64_decode(str_pad(strtr($data, '-_', '+/'), 4 - ((strlen($data) % 4) ?: 4), '=', STR_PAD_RIGHT));
+        $data = strtr($data, '-_', '+/');
+        $padding = strlen($data) % 4;
+        if ($padding > 0) {
+            $data .= str_repeat('=', 4 - $padding);
+        }
+        return base64_decode($data);
+    }
+
+    function publicKeyToPem($b64url) {
+        // Step 1: Convert from base64url to base64
+        $b64 = strtr($b64url, '-_', '+/');
+        $b64 = rtrim($b64, '='); // remove extra padding if present
+
+        // Step 2: Fix base64 padding (length must be divisible by 4)
+        $mod4 = strlen($b64) % 4;
+        if ($mod4 > 0) {
+            $b64 .= str_repeat('=', 4 - $mod4);
+        }
+
+        // Step 3: Chunk the base64 into 64-character lines
+        $pemBody = chunk_split($b64, 64, "\n");
+
+        // Step 4: Wrap it in PEM headers
+        return "-----BEGIN PUBLIC KEY-----\n" . $pemBody . "-----END PUBLIC KEY-----\n";
     }
 
     #---------------------
@@ -963,6 +1041,7 @@ bd(\rtrim($userPassKeys[0]['public_key'], '='), 'user public key');
             $template->noChildren = 1;
             $template->noParents = -1; // one page only
             $template->urlSegments = "start register verify end";
+            $template->contentType = "json";
             $template->https = 1; // always only https
             $template->noAppendTemplateFile = 1; // disable auto-append of eg _main.php
             $template->noUnpublish = 1; // must always be published

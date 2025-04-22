@@ -77,7 +77,7 @@ let lpk = {
                 if (typeof fwd === 'string') {
                     fwd = JSON.parse(fwd)
                 }
-
+console.log('fwd', fwd)
                 let pk = fwd.data.pk
 
                 pk.publicKey.user.id  = encoder.encode(pk.publicKey.user.id ).buffer;
@@ -100,12 +100,12 @@ let lpk = {
                }
 
                 if(cred) {
+
                     data = {
                         fn: 'register',
                         next: 'end',
                         aarcreate: await cred.toJSON()
                     }
-
                 } else {
                     data = {
                         fn: 'register',
@@ -126,10 +126,14 @@ let lpk = {
                 break;
 
             case 'verify':
+                if (typeof fwd === 'string') {
+                    fwd = JSON.parse(fwd)
+                }
+                console.log(fwd)
+
                 let va = fwd.data.verifyArgs
                 va.publicKey.challenge  = encoder.encode(va.publicKey.challenge).buffer;
                 va.publicKey.allowCredentials = []
-
 
                 //get credentials
                 try {
@@ -141,11 +145,19 @@ let lpk = {
                 }
 
                 if(cred) {
+                    const clientDataHash = await crypto.subtle.digest("SHA-256", cred.response.clientDataJSON);
+                    console.log('clientDataHash', clientDataHash)
+
+                    const signedData = new Uint8Array(cred.response.authenticatorData.byteLength + clientDataHash.byteLength);
+                    signedData.set(new Uint8Array(cred.response.authenticatorData), 0);
+                    signedData.set(new Uint8Array(clientDataHash), cred.response.authenticatorData.byteLength);
+
                     data = {
                         fn: "verify",
                         next: "end",
                         aarverify: await cred.toJSON(),
                         challenge:  credToJSON(va.publicKey.challenge),
+                        signedData: bufferToBase64url(signedData),
                         errno: 101
                     }
 
@@ -206,10 +218,25 @@ let lpk = {
     registerOnly: async (apiUrl, data) => {
         data.fn = 'register'
         data.end = 'end'
-        return await lpk.action(`${apiUrl}register`, data).then (res => {
+
+        await lpk.action(`${apiUrl}register`, data).then (fwd => {
+            result = {}
+            result.end = true
+            if(fwd && fwd.msg)
+                result.msg = fwd.msg
+            if(fwd && fwd.error)
+                result.error = fwd.error
+            if(fwd && fwd.un)
+                result.un = fwd.un
+            if(fwd && fwd.errno)
+                result.errno = fwd.errno
+            console.log(result)
+            return result
         })
     }
 }
+
+/*
 
 const connectPost = async (data, url) => {
     let body = JSON.stringify(data)
@@ -230,6 +257,39 @@ const connectPost = async (data, url) => {
         console.log('url:', url);
     }
 }
+
+*/
+
+
+const connectPost = async (data, url) => {
+    let body = JSON.stringify(data);
+    try {
+        let connect = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: body
+        });
+        const contentType = connect.headers.get("Content-Type");
+
+        // If it's JSON, parse it
+        if (contentType && contentType.includes("application/json")) {
+            return await connect.json();
+        }
+
+        // Otherwise, log what went wrong
+        const text = await connect.text();
+        console.error("Expected JSON but got:", text);
+        throw new Error(`Invalid response: ${text.substring(0, 100)}...`);
+
+    } catch (error) {
+        console.error('Error fetching post request data:', error.message);
+        console.log('data:', data);
+        console.log('url:', url);
+    }
+}
+
 
 
 function recursiveBase64StrToArrayBuffer(obj) {
@@ -257,7 +317,6 @@ function recursiveBase64StrToArrayBuffer(obj) {
     }
 }
 
-
 /**
  * Convert a ArrayBuffer to Base64
  * @param {ArrayBuffer} buffer
@@ -277,11 +336,15 @@ function credToJSON(item) {
     return JSON.parse(JSON.stringify(arrayBufferToBase64(item)));
 }
 
-function hex2bin(hex) {
-    var length = hex.length / 2;
-    var result = new Uint8Array(length);
-    for (var i = 0; i < length; ++i) {
-        result[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+function bufferToBase64url(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
     }
-    return result;
+    return btoa(binary)
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
 }
+

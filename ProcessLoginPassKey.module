@@ -30,7 +30,7 @@ class ProcessLoginPassKey extends ProcessModule
         $lpk = $this->wire('modules')->get('LoginPassKey');
         $session = $this->wire('session');
 
-        if($lpk->enabledAdmin === 1) {
+        if ($lpk->enabledAdmin === 1) {
             // Disable adding passkeys if Admin disabled in module config
             $config = $this->wire('config');
             $user = $this->wire('user');
@@ -73,7 +73,7 @@ class ProcessLoginPassKey extends ProcessModule
         $checkbox->checkboxOnly = true;
         $checkbox->label = ' ';
 
-        /** @var InputfieldMarkup  */
+        /** @var InputfieldMarkup */
         $f = $modules->get('InputfieldMarkup');
         $markup = "<h3>";
         $markup .= $this->_("Please note:");
@@ -90,7 +90,7 @@ class ProcessLoginPassKey extends ProcessModule
 
         /** @var InputfieldButton $f */
         $lpk = $this->wire('modules')->get('LoginPassKey');
-        if($lpk->enabledAdmin === 1) {
+        if ($lpk->enabledAdmin === 1) {
             $f = wire('modules')->get('InputfieldButton');
             $f->attr('name', 'btn');
             $f->addClass(['top_button', 'add-passkey']);
@@ -109,9 +109,9 @@ class ProcessLoginPassKey extends ProcessModule
         $f->showInHeader(true);
         $form->add($f);
 
-        if($input->post('submit_delete_checked') && is_array($input->post('deletes'))) {
+        if ($input->post('submit_delete_checked') && is_array($input->post('deletes'))) {
             $count = $this->deletePassKeys($form);
-            if($count > 0) {
+            if ($count > 0) {
                 $this->message(sprintf(_n('%d PassKey deleted from database.', '%d PassKeys deleted from database.', $count), $count));
                 $this->session->redirect($this->wire()->page->url);
             }
@@ -122,7 +122,7 @@ class ProcessLoginPassKey extends ProcessModule
     public function renderPagination()
     {
         $input = $this->wire('input');
-    //    $items_per_page = 2;
+        //    $items_per_page = 2;
         $start = ($input->pageNum - 1) * $this->limit;
         $total = (int)$this->countCredentialsInDb();
 
@@ -185,7 +185,7 @@ class ProcessLoginPassKey extends ProcessModule
         $form->processInput($input->post); // for CSRF only
         $ids = \implode(",", $input->post('deletes'));
 
-        $sql = "DELETE FROM " . $lpk->getTableName() . " WHERE id IN (" .$ids . ")";
+        $sql = "DELETE FROM " . $lpk->getTableName() . " WHERE id IN (" . $ids . ")";
         $query = $db->prepare($sql);
         $query->closeCursor();
 
@@ -206,10 +206,10 @@ class ProcessLoginPassKey extends ProcessModule
         //$lpk = $modules->get("LoginPassKey");
         $passkeys = $this->getAllCredentialsFromDB();
 
-        if(\count($passkeys) === 0) {
-            $table->row(['',$this->_("There are no passkeys."), '', '']);
+        if (\count($passkeys) === 0) {
+            $table->row(['', $this->_("There are no passkeys."), '', '']);
         }
-        foreach($passkeys as $passkey => $v) {
+        foreach ($passkeys as $passkey => $v) {
             $checkbox->attr('id', "delete_" . $sanitizer->int($v->id));
             $checkbox->attr('value', $v->id);
 

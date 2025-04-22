@@ -1,0 +1,55 @@
+/*
+ * Copyright (c) 2025.
+ * Clip Magic - Prue Rowland
+ * Web: www.clipmagic.com.au
+ * Email: admin@clipmagic.com.au
+ *
+ * https://processwire.com
+ */
+
+/*
+.ProcessLogin #ProcessLoginForm .InputfieldButtonLink:has([name='lpk'])  {
+    display: block;
+    margin-inline: 0 auto;
+
+    > {
+        display: block;
+        margin: 0 !important;
+    }
+
+}
+*/
+
+.ProcessLogin #ProcessLoginForm {
+
+    --mgn: 0;
+
+    .pw-content .ui-button {
+        margin-left: var(--mgn);
+        margin-right: var(--mgn);
+    }
+    .InputfieldSubmit,
+    .InputfieldButton,
+    a {
+        display: block !important;
+        width: 100% !important;
+        padding-top: var(--mgn);
+    }
+    .InputfieldSubmit .InputfieldContent .ui-button,
+    .InputfieldButton .InputfieldContent .ui-button {
+        display: block;
+        margin-inline: var(--mgn) !important;
+        width: 100%;
+    }
+    .Inputfield:not(.InputfieldHidden, .InputfieldButton, .InputfieldSubmit) .InputfieldContent {
+        padding: 1px var(--mgn) 23px var(--mgn);
+    }
+
+    .InputfieldMarkup.InputfieldHeaderHidden>.InputfieldContent {
+         padding-top: var(--mgn);
+
+        * {
+            text-wrap: pretty;
+        }
+    }
+}

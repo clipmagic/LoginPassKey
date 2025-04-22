@@ -63,7 +63,6 @@ if ($post) {
 
             if(!empty($data->aarcreate)) {
                 $created = $page->lpkRegisterUser($user, $data->aarcreate);
-
                 bd($created, 'created');
 
                 if(!!$created) {
@@ -75,8 +74,6 @@ if ($post) {
                 $lpkData->msg = $page->lpkGetErrorMessage(2);
                 $lpkData->errno = 2;
             }
-            bd($lpkData, 'lpkData in register');
-            return \json_encode($lpkData);
             break;
 
         case 'verify':
@@ -87,7 +84,7 @@ if ($post) {
                 $lpkData->data->next = 'end';
 
             } else {
-                $verified = $page->lpkVerifyResponse($data->aarverify, $data->challenge);
+                $verified = $page->lpkVerifyResponse($data->aarverify, $data->challenge, $data->signedData);
 
                 $lpkData->data = $verified;
                 if ($verified->errno === 101) {
@@ -112,5 +109,5 @@ if ($post) {
         default:
             break;
     }
-    return json_encode($lpkData);
+    return \json_encode($lpkData);
 }
