@@ -104,7 +104,7 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
 
             $js  = "<script>";
             $js .= "let apiUrl = '$apiUrl'\n";
-            $js .= "lpk.registerOnly('$apiUrl', $fwdJSON)\n";
+            $js .= "lpk.register('$apiUrl' + 'register', $fwdJSON)\n";
             $js .= "</script>";
             $return = str_ireplace("</body>", $js . "</body>", $event->return);
 
