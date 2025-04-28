@@ -15,7 +15,6 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         if(!$lpk->enabled === 1) return;
 
         $apiUrl = $lpk->api_url;
-//        $redirectUrl = !empty($lpk->redirect_url) ? $page->lpkGetRedirectUrl() : $page->url;
 
         $form = $event->return;
 
