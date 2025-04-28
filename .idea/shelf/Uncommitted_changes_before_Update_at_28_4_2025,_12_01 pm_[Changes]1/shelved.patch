@@ -1,0 +1,323 @@
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__5_12pm__Changes_.xml
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__5_12pm__Changes_.xml b/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__5_12pm__Changes_.xml
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__5_12pm__Changes_.xml	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,4 +0,0 @@
+-<changelist name="Uncommitted_changes_before_Update_at_1_4_2025,_5_12 pm_[Changes]" date="1744500675182" recycled="false" toDelete="true" deleted="true">
+-  <option name="PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_5_12 pm_[Changes]/shelved.patch" />
+-  <option name="DESCRIPTION" value="Uncommitted changes before Update at 1/4/2025, 5:12 pm [Changes]" />
+-</changelist>
+\ No newline at end of file
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_59pm__Changes_.xml
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_59pm__Changes_.xml b/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_59pm__Changes_.xml
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_59pm__Changes_.xml	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,4 +0,0 @@
+-<changelist name="Uncommitted_changes_before_Update_at_1_4_2025,_4_59 pm_[Changes]" date="1744500678885" recycled="false" toDelete="true" deleted="true">
+-  <option name="PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_59 pm_[Changes]/shelved.patch" />
+-  <option name="DESCRIPTION" value="Uncommitted changes before Update at 1/4/2025, 4:59 pm [Changes]" />
+-</changelist>
+\ No newline at end of file
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025__9_26am__Changes_.xml
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025__9_26am__Changes_.xml b/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025__9_26am__Changes_.xml
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025__9_26am__Changes_.xml	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,4 +0,0 @@
+-<changelist name="Uncommitted_changes_before_Update_at_13_4_2025,_9_26 am_[Changes]" date="1744500373784" recycled="false" toDelete="true">
+-  <option name="PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025,_9_26 am_[Changes]/shelved.patch" />
+-  <option name="DESCRIPTION" value="Uncommitted changes before Update at 13/4/2025, 9:26 am [Changes]" />
+-</changelist>
+\ No newline at end of file
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_5_12 pm_[Changes]/shelved.patch
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_5_12 pm_[Changes]/shelved.patch b/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_5_12 pm_[Changes]/shelved.patch
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_5_12 pm_[Changes]/shelved.patch	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,55 +0,0 @@
+-Index: .idea/workspace.xml
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+-<+><?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<project version=\"4\">\n  <component name=\"AutoImportSettings\">\n    <option name=\"autoReloadType\" value=\"SELECTIVE\" />\n  </component>\n  <component name=\"ChangeListManager\">\n    <list default=\"true\" id=\"e69aaa26-14a0-4a52-8512-ecd089f971ab\" name=\"Changes\" comment=\"minor update\" />\n    <option name=\"SHOW_DIALOG\" value=\"false\" />\n    <option name=\"HIGHLIGHT_CONFLICTS\" value=\"true\" />\n    <option name=\"HIGHLIGHT_NON_ACTIVE_CHANGELIST\" value=\"false\" />\n    <option name=\"LAST_RESOLUTION\" value=\"IGNORE\" />\n  </component>\n  <component name=\"ComposerSettings\">\n    <execution />\n  </component>\n  <component name=\"Git.Merge.Settings\">\n    <option name=\"BRANCH\" value=\"origin/main\" />\n  </component>\n  <component name=\"Git.Settings\">\n    <option name=\"RECENT_GIT_ROOT_PATH\" value=\"$PROJECT_DIR$\" />\n    <option name=\"RESET_MODE\" value=\"MIXED\" />\n    <option name=\"UPDATE_TYPE\" value=\"REBASE\" />\n  </component>\n  <component name=\"GitHubPullRequestSearchHistory\">{\n  &quot;lastFilter&quot;: {\n    &quot;state&quot;: &quot;OPEN&quot;,\n    &quot;assignee&quot;: &quot;clipmagic&quot;\n  }\n}</component>\n  <component name=\"GithubPullRequestsUISettings\">{\n  &quot;selectedUrlAndAccountId&quot;: {\n    &quot;url&quot;: &quot;https://github.com/clipmagic/LoginPassKey.git&quot;,\n    &quot;accountId&quot;: &quot;e7c8d009-4c25-4a53-8252-496a1b1de7b8&quot;\n  }\n}</component>\n  <component name=\"PhpWorkspaceProjectConfiguration\" interpreter_name=\"/opt/homebrew/Cellar/php/8.3.2/bin/php\" />\n  <component name=\"ProjectColorInfo\">{\n  &quot;associatedIndex&quot;: 1\n}</component>\n  <component name=\"ProjectId\" id=\"2v76Pt4gLRvpLEVKQmi0bZqcwMh\" />\n  <component name=\"ProjectLevelVcsManager\" settingsEditedManually=\"true\" />\n  <component name=\"ProjectViewState\">\n    <option name=\"hideEmptyMiddlePackages\" value=\"true\" />\n    <option name=\"showLibraryContents\" value=\"true\" />\n  </component>\n  <component name=\"PropertiesComponent\">{\n  &quot;keyToString&quot;: {\n    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,\n    &quot;git-widget-placeholder&quot;: &quot;main&quot;,\n    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,\n    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,\n    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,\n    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,\n    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,\n    &quot;settings.editor.selected.configurable&quot;: &quot;reference.settings.ide.settings.web.browsers&quot;,\n    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;\n  }\n}</component>\n  <component name=\"RecentsManager\">\n    <key name=\"MoveFile.RECENT_KEYS\">\n      <recent name=\"$PROJECT_DIR$\" />\n    </key>\n  </component>\n  <component name=\"SharedIndexes\">\n    <attachedChunks>\n      <set>\n        <option value=\"bundled-js-predefined-d6986cc7102b-5c90d61e3bab-JavaScript-PS-242.23726.107\" />\n        <option value=\"bundled-php-predefined-a98d8de5180a-90914f2295cb-com.jetbrains.php.sharedIndexes-PS-242.23726.107\" />\n      </set>\n    </attachedChunks>\n  </component>\n  <component name=\"SpellCheckerSettings\" RuntimeDictionaries=\"0\" Folders=\"0\" CustomDictionaries=\"0\" DefaultDictionary=\"application-level\" UseSingleDictionary=\"true\" transferred=\"true\" />\n  <component name=\"TaskManager\">\n    <task active=\"true\" id=\"Default\" summary=\"Default task\">\n      <changelist id=\"e69aaa26-14a0-4a52-8512-ecd089f971ab\" name=\"Changes\" comment=\"\" />\n      <created>1743483744338</created>\n      <option name=\"number\" value=\"Default\" />\n      <option name=\"presentableId\" value=\"Default\" />\n      <updated>1743483744338</updated>\n      <workItem from=\"1743483745338\" duration=\"3187000\" />\n      <workItem from=\"1743486945856\" duration=\"306000\" />\n    </task>\n    <task id=\"LOCAL-00001\" summary=\"minor update\">\n      <option name=\"closed\" value=\"true\" />\n      <created>1743484057334</created>\n      <option name=\"number\" value=\"00001\" />\n      <option name=\"presentableId\" value=\"LOCAL-00001\" />\n      <option name=\"project\" value=\"LOCAL\" />\n      <updated>1743484057334</updated>\n    </task>\n    <task id=\"LOCAL-00002\" summary=\"minor update\">\n      <option name=\"closed\" value=\"true\" />\n      <created>1743485654551</created>\n      <option name=\"number\" value=\"00002\" />\n      <option name=\"presentableId\" value=\"LOCAL-00002\" />\n      <option name=\"project\" value=\"LOCAL\" />\n      <updated>1743485654551</updated>\n    </task>\n    <task id=\"LOCAL-00003\" summary=\"minor update\">\n      <option name=\"closed\" value=\"true\" />\n      <created>1743485827243</created>\n      <option name=\"number\" value=\"00003\" />\n      <option name=\"presentableId\" value=\"LOCAL-00003\" />\n      <option name=\"project\" value=\"LOCAL\" />\n      <updated>1743485827243</updated>\n    </task>\n    <task id=\"LOCAL-00004\" summary=\"minor update\">\n      <option name=\"closed\" value=\"true\" />\n      <created>1743486313164</created>\n      <option name=\"number\" value=\"00004\" />\n      <option name=\"presentableId\" value=\"LOCAL-00004\" />\n      <option name=\"project\" value=\"LOCAL\" />\n      <updated>1743486313164</updated>\n    </task>\n    <task id=\"LOCAL-00005\" summary=\"minor update\">\n      <option name=\"closed\" value=\"true\" />\n      <created>1743486393139</created>\n      <option name=\"number\" value=\"00005\" />\n      <option name=\"presentableId\" value=\"LOCAL-00005\" />\n      <option name=\"project\" value=\"LOCAL\" />\n      <updated>1743486393139</updated>\n    </task>\n    <task id=\"LOCAL-00006\" summary=\"minor update\">\n      <option name=\"closed\" value=\"true\" />\n      <created>1743486719187</created>\n      <option name=\"number\" value=\"00006\" />\n      <option name=\"presentableId\" value=\"LOCAL-00006\" />\n      <option name=\"project\" value=\"LOCAL\" />\n      <updated>1743486719187</updated>\n    </task>\n    <task id=\"LOCAL-00007\" summary=\"minor update\">\n      <option name=\"closed\" value=\"true\" />\n      <created>1743487006450</created>\n      <option name=\"number\" value=\"00007\" />\n      <option name=\"presentableId\" value=\"LOCAL-00007\" />\n      <option name=\"project\" value=\"LOCAL\" />\n      <updated>1743487006450</updated>\n    </task>\n    <option name=\"localTasksCounter\" value=\"8\" />\n    <servers />\n  </component>\n  <component name=\"TypeScriptGeneratedFilesManager\">\n    <option name=\"version\" value=\"3\" />\n  </component>\n  <component name=\"Vcs.Log.Tabs.Properties\">\n    <option name=\"TAB_STATES\">\n      <map>\n        <entry key=\"MAIN\">\n          <value>\n            <State>\n              <option name=\"FILTERS\">\n                <map>\n                  <entry key=\"branch\">\n                    <value>\n                      <list>\n                        <option value=\"main\" />\n                      </list>\n                    </value>\n                  </entry>\n                </map>\n              </option>\n            </State>\n          </value>\n        </entry>\n      </map>\n    </option>\n  </component>\n  <component name=\"VcsManagerConfiguration\">\n    <MESSAGE value=\"minor update\" />\n    <option name=\"LAST_COMMIT_MESSAGE\" value=\"minor update\" />\n  </component>\n</project>
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/workspace.xml b/.idea/workspace.xml
+---- a/.idea/workspace.xml	(revision a0eadfa806938c25b7583925c98b5397cb9669d0)
+-+++ b/.idea/workspace.xml	(date 1743487934310)
+-@@ -4,7 +4,9 @@
+-     <option name="autoReloadType" value="SELECTIVE" />
+-   </component>
+-   <component name="ChangeListManager">
+--    <list default="true" id="e69aaa26-14a0-4a52-8512-ecd089f971ab" name="Changes" comment="minor update" />
+-+    <list default="true" id="e69aaa26-14a0-4a52-8512-ecd089f971ab" name="Changes" comment="minor update">
+-+      <change beforePath="$PROJECT_DIR$/LoginPassKey.css" beforeDir="false" afterPath="$PROJECT_DIR$/LoginPassKey.css" afterDir="false" />
+-+    </list>
+-     <option name="SHOW_DIALOG" value="false" />
+-     <option name="HIGHLIGHT_CONFLICTS" value="true" />
+-     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+-@@ -78,7 +80,7 @@
+-       <option name="presentableId" value="Default" />
+-       <updated>1743483744338</updated>
+-       <workItem from="1743483745338" duration="3187000" />
+--      <workItem from="1743486945856" duration="306000" />
+-+      <workItem from="1743486945856" duration="986000" />
+-     </task>
+-     <task id="LOCAL-00001" summary="minor update">
+-       <option name="closed" value="true" />
+-@@ -136,7 +138,23 @@
+-       <option name="project" value="LOCAL" />
+-       <updated>1743487006450</updated>
+-     </task>
+--    <option name="localTasksCounter" value="8" />
+-+    <task id="LOCAL-00008" summary="minor update">
+-+      <option name="closed" value="true" />
+-+      <created>1743487394330</created>
+-+      <option name="number" value="00008" />
+-+      <option name="presentableId" value="LOCAL-00008" />
+-+      <option name="project" value="LOCAL" />
+-+      <updated>1743487394330</updated>
+-+    </task>
+-+    <task id="LOCAL-00009" summary="minor update">
+-+      <option name="closed" value="true" />
+-+      <created>1743487619210</created>
+-+      <option name="number" value="00009" />
+-+      <option name="presentableId" value="LOCAL-00009" />
+-+      <option name="project" value="LOCAL" />
+-+      <updated>1743487619210</updated>
+-+    </task>
+-+    <option name="localTasksCounter" value="10" />
+-     <servers />
+-   </component>
+-   <component name="TypeScriptGeneratedFilesManager">
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch b/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,106 +0,0 @@
+-Index: .idea/.gitignore
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/.gitignore b/.idea/.gitignore
+-new file mode 100755
+---- /dev/null	(date 1743483749510)
+-+++ b/.idea/.gitignore	(date 1743483749510)
+-@@ -0,0 +1,8 @@
+-+# Default ignored files
+-+/shelf/
+-+/workspace.xml
+-+# Editor-based HTTP Client requests
+-+/httpRequests/
+-+# Datasource local storage ignored files
+-+/dataSources/
+-+/dataSources.local.xml
+-Index: .idea/LoginPassKey.iml
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/LoginPassKey.iml b/.idea/LoginPassKey.iml
+-new file mode 100755
+---- /dev/null	(date 1743483980000)
+-+++ b/.idea/LoginPassKey.iml	(date 1743483980000)
+-@@ -0,0 +1,8 @@
+-+<?xml version="1.0" encoding="UTF-8"?>
+-+<module type="WEB_MODULE" version="4">
+-+  <component name="NewModuleRootManager">
+-+    <content url="file://$MODULE_DIR$" />
+-+    <orderEntry type="inheritedJdk" />
+-+    <orderEntry type="sourceFolder" forTests="false" />
+-+  </component>
+-+</module>
+-\ No newline at end of file
+-Index: .idea/modules.xml
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/modules.xml b/.idea/modules.xml
+-new file mode 100755
+---- /dev/null	(date 1743483980000)
+-+++ b/.idea/modules.xml	(date 1743483980000)
+-@@ -0,0 +1,8 @@
+-+<?xml version="1.0" encoding="UTF-8"?>
+-+<project version="4">
+-+  <component name="ProjectModuleManager">
+-+    <modules>
+-+      <module fileurl="file://$PROJECT_DIR$/.idea/LoginPassKey.iml" filepath="$PROJECT_DIR$/.idea/LoginPassKey.iml" />
+-+    </modules>
+-+  </component>
+-+</project>
+-\ No newline at end of file
+-Index: .idea/php.xml
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/php.xml b/.idea/php.xml
+-new file mode 100755
+---- /dev/null	(date 1743483980010)
+-+++ b/.idea/php.xml	(date 1743483980010)
+-@@ -0,0 +1,22 @@
+-+<?xml version="1.0" encoding="UTF-8"?>
+-+<project version="4">
+-+  <component name="MessDetectorOptionsConfiguration">
+-+    <option name="transferred" value="true" />
+-+  </component>
+-+  <component name="PHPCSFixerOptionsConfiguration">
+-+    <option name="transferred" value="true" />
+-+  </component>
+-+  <component name="PHPCodeSnifferOptionsConfiguration">
+-+    <option name="highlightLevel" value="WARNING" />
+-+    <option name="transferred" value="true" />
+-+  </component>
+-+  <component name="PhpProjectSharedConfiguration" php_language_level="8.1">
+-+    <option name="suggestChangeDefaultLanguageLevel" value="false" />
+-+  </component>
+-+  <component name="PhpStanOptionsConfiguration">
+-+    <option name="transferred" value="true" />
+-+  </component>
+-+  <component name="PsalmOptionsConfiguration">
+-+    <option name="transferred" value="true" />
+-+  </component>
+-+</project>
+-\ No newline at end of file
+-Index: .idea/vcs.xml
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/vcs.xml b/.idea/vcs.xml
+-new file mode 100755
+---- /dev/null	(date 1743483980010)
+-+++ b/.idea/vcs.xml	(date 1743483980010)
+-@@ -0,0 +1,6 @@
+-+<?xml version="1.0" encoding="UTF-8"?>
+-+<project version="4">
+-+  <component name="VcsDirectoryMappings">
+-+    <mapping directory="" vcs="Git" />
+-+  </component>
+-+</project>
+-\ No newline at end of file
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_59 pm_[Changes]/shelved.patch
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_59 pm_[Changes]/shelved.patch b/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_59 pm_[Changes]/shelved.patch
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_59 pm_[Changes]/shelved.patch	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,15 +0,0 @@
+-Index: .gitignore
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.gitignore b/.gitignore
+-new file mode 100755
+---- /dev/null	(date 1743487103850)
+-+++ b/.gitignore	(date 1743487103850)
+-@@ -0,0 +1,5 @@
+-+/.idea/php.xml
+-+/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch
+-+/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_52pm__Changes_.xml
+-+/.idea/vcs.xml
+-+/.idea/workspace.xml
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_52pm__Changes_.xml
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_52pm__Changes_.xml b/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_52pm__Changes_.xml
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_52pm__Changes_.xml	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,4 +0,0 @@
+-<changelist name="Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]" date="1744500682525" recycled="false" toDelete="true" deleted="true">
+-  <option name="PATH" value="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch" />
+-  <option name="DESCRIPTION" value="Uncommitted changes before Update at 1/4/2025, 4:52 pm [Changes]" />
+-</changelist>
+\ No newline at end of file
+Index: .idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025,_9_26 am_[Changes]/shelved.patch
+===================================================================
+diff --git a/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025,_9_26 am_[Changes]/shelved.patch b/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025,_9_26 am_[Changes]/shelved.patch
+deleted file mode 100644
+--- a/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025,_9_26 am_[Changes]/shelved.patch	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
++++ /dev/null	(revision 29b5be555d00537fd36e577287e8dc881c5b503a)
+@@ -1,71 +0,0 @@
+-Index: .gitignore
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.gitignore b/.gitignore
+-new file mode 100755
+---- /dev/null	(date 1744499898110)
+-+++ b/.gitignore	(date 1744499898110)
+-@@ -0,0 +1,5 @@
+-+/.idea/php.xml
+-+/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch
+-+/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_52pm__Changes_.xml
+-+/.idea/vcs.xml
+-+/.idea/workspace.xml
+-Index: .idea/.gitignore
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/.gitignore b/.idea/.gitignore
+-new file mode 100755
+---- /dev/null	(date 1744499921290)
+-+++ b/.idea/.gitignore	(date 1744499921290)
+-@@ -0,0 +1,8 @@
+-+# Default ignored files
+-+/shelf/
+-+/workspace.xml
+-+# Editor-based HTTP Client requests
+-+/httpRequests/
+-+# Datasource local storage ignored files
+-+/dataSources/
+-+/dataSources.local.xml
+-Index: .idea/LoginPassKey.iml
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/LoginPassKey.iml b/.idea/LoginPassKey.iml
+-new file mode 100755
+---- /dev/null	(date 1744499921300)
+-+++ b/.idea/LoginPassKey.iml	(date 1744499921300)
+-@@ -0,0 +1,8 @@
+-+<?xml version="1.0" encoding="UTF-8"?>
+-+<module type="WEB_MODULE" version="4">
+-+  <component name="NewModuleRootManager">
+-+    <content url="file://$MODULE_DIR$" />
+-+    <orderEntry type="inheritedJdk" />
+-+    <orderEntry type="sourceFolder" forTests="false" />
+-+  </component>
+-+</module>
+-\ No newline at end of file
+-Index: .idea/modules.xml
+-IDEA additional info:
+-Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+-<+>UTF-8
+-===================================================================
+-diff --git a/.idea/modules.xml b/.idea/modules.xml
+-new file mode 100755
+---- /dev/null	(date 1744499921300)
+-+++ b/.idea/modules.xml	(date 1744499921300)
+-@@ -0,0 +1,8 @@
+-+<?xml version="1.0" encoding="UTF-8"?>
+-+<project version="4">
+-+  <component name="ProjectModuleManager">
+-+    <modules>
+-+      <module fileurl="file://$PROJECT_DIR$/.idea/LoginPassKey.iml" filepath="$PROJECT_DIR$/.idea/LoginPassKey.iml" />
+-+    </modules>
+-+  </component>
+-+</project>
+-\ No newline at end of file
