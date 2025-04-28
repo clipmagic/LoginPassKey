@@ -10,7 +10,6 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
 
         $modules = wire('modules');
         $lpk = $modules->get('LoginPassKey');
-        $page = wire('page');
 
         // ensure LPK is enabled for the frontend
         if(!$lpk->enabled === 1) return;
