@@ -89,17 +89,20 @@ if ($post) {
                 $lpkData->data = $verified;
                 if ($verified->errno === 101) {
                     $lpkData->msg = $page->lpkGetErrorMessage(101);
+                    $lpkData->errno = $verified->errno;
                     $username = $session->getFor('lpk', 'username');
                     $feUser = $page->lpkGetUserByField($username);
                     $session->setFor('lpk', 'success', 'success');
                     $session->forceLogin($feUser);
-                    $lpkConfig = $modules->getConfig('LoginPassKey');
+
+                    $goToPage = $page->lpkGetRedirectUrl();
                     if($session->getFor('lpk', 'inadmin')) {
                         $processLogin = $modules->get('ProcessLogin');
                         $processLogin->execute();
-                    } elseif(!empty($lpkConfig['redirect_url'])) {
-                        $session->redirect($page->lpkGetRedirectURL());
-                    };
+                    } else {
+                        $lpkData->goto = !empty($goToPage) ? $goToPage : $pages->get(1)->httpUrl;
+                    }
+
                 }
             }
             break;

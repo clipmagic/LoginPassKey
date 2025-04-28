@@ -15,6 +15,8 @@ function runOnStart() {
     btn.addEventListener('click', (e) => {
         e.preventDefault()
 
+
+
         lpk.action(`${apiUrl}start`).then (res => {
             console.log(res)
             if(res && res.errno) {

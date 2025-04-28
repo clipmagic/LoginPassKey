@@ -2,15 +2,21 @@
 
 // LoginPassKey with LoginRegisterPro
 if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPassKey')) {
-    // Add button & script to login FE page
+
+    if($modules->get('LoginPassKey')->enabled !== 1) return;
+
+    // Add button & script to login FE form
     $wire->addHookAfter('LoginRegisterProLogin::build', function ($event) {
 
         $modules = wire('modules');
         $lpk = $modules->get('LoginPassKey');
+        $page = wire('page');
 
-        $modConfig = $modules->getConfig('LoginPassKey');
-        $apiUrl = $modConfig['api_url'];
-        $redirectUrl = $modConfig['redirect_url'];
+        // ensure LPK is enabled for the frontend
+        if(!$lpk->enabled === 1) return;
+
+        $apiUrl = $lpk->api_url;
+//        $redirectUrl = !empty($lpk->redirect_url) ? $page->lpkGetRedirectUrl() : $page->url;
 
         $form = $event->return;
 
@@ -21,7 +27,9 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         $passkeyButton->attr('value', $lpk->_("Login with PassKey"));
         $passkeyButton->icon = 'key';
         $passkeyButton->attr('href', '#');
-        $form->add($passkeyButton);
+
+        $pwdFld = $form->get('login_pass');
+        $form->insertBefore($passkeyButton, $pwdFld);
 
         $markUp = $modules->get('InputfieldMarkup');
         $markUp->attr('id+name', 'end');
@@ -32,7 +40,6 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         // get the api url from the LPK configuration
         $html .= "<script>";
         $html .= "let apiUrl = '$apiUrl'\n";
-        $html .= "let redirectUrl = '$redirectUrl'\n";
         $html .= "</script>";
 
 
@@ -47,10 +54,8 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
                 btn.addEventListener('click', (e) => {
                     e.preventDefault()
                     lpk.action(`${apiUrl}start`).then (res => {
-                        console.log(res)
-                        if(res && res.errno && res.errno === 101) {
-                            //end.textContent = res.msg
-                            window.location.href = '${redirectUrl}'
+                        if(res && res.errno && res.errno === 101 && res.goto) {
+                            window.location.href = res.goto
                         }
                         if(res && res.errno && res.msg) {
                             end.textContent = res.msg
@@ -82,8 +87,7 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         $user = $this->wire('user');
         $page = $this->wire('page');
         $lpk = $this->wire('modules')->get('LoginPassKey');
-        $modConfig = wire('modules')->getConfig('LoginPassKey');
-        $apiUrl = $modConfig['api_url'];
+        $apiUrl = $lpk->api_url;
 
         if ($user->isLoggedIn() && $lpk->enabled === 1 && $page->template->name !== 'admin') {
             // auto trigger the registration process
@@ -100,7 +104,7 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
 
             $js  = "<script>";
             $js .= "let apiUrl = '$apiUrl'\n";
-            $js .= "lpk.registerOnly($apiUrl, $fwdJSON)\n";
+            $js .= "lpk.registerOnly('$apiUrl', $fwdJSON)\n";
             $js .= "</script>";
             $return = str_ireplace("</body>", $js . "</body>", $event->return);
 
@@ -108,5 +112,45 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
             $session->setFor('lpk', 'success', 'success');
             $event->return = $return;
         }
+    });
+
+    // Add some transitions (could have put it in above hook but cleaner
+    // to keep them separate. Better still, move the styles & script to
+    // your own files
+    $wire->addHookAfter('Page::render', function ($event) {
+        $css = <<<EOT
+                <style>                    
+                    .LoginRegisterPro .LoginForm .Inputfields {
+                        position: relative;
+                        display: grid;
+                        grid-template-rows: auto auto 0fr 0fr 0fr;
+                        transition: grid-template-rows 1s;
+                    }                    
+                    .LoginRegisterPro .LoginForm .Inputfields > * {
+                        overflow: hidden;
+                        padding: 0 !important;
+                    }                    
+                    .LoginRegisterPro .LoginForm .Inputfields.pword {
+                        grid-template-rows: auto 0fr auto auto auto;
+                    }                    
+                </style>
+EOT;
+        $js = <<<EOT
+<script>
+     let btn = document.getElementById('lpk')
+     if(btn) {
+         btn.addEventListener('click', (e) => {
+             let nameFld = document.querySelector('.LoginRegisterPro .LoginForm #login_name')
+             if(nameFld.value === '') {
+               document.getElementById('Inputfield_login_submit').click();
+               return false;
+             }
+             document.querySelector('.LoginRegisterPro .LoginForm .Inputfields').classList.toggle('pword');
+         })
+     }
+</script>
+EOT;
+        $return = str_ireplace("</head>", $css, $event->return);
+        $event->return = str_ireplace("</body>", $js, $return);
     });
 }

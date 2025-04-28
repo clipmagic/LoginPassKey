@@ -1,3 +1,7 @@
+/*
+
+*** No longer required ***
+
 jQuery(document).ready(function($) {
 
     $('.btn-delete-checked').hide();
@@ -53,3 +57,5 @@ function startApi() {
     })
 }
 startApi()
+
+ */

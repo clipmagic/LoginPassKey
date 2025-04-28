@@ -28,24 +28,6 @@ class ProcessLoginPassKey extends ProcessModule
     {
         parent::init(); // always remember to call the parent init
         $lpk = $this->wire('modules')->get('LoginPassKey');
-        $session = $this->wire('session');
-
-        if ($lpk->enabledAdmin === 1) {
-            // Disable adding passkeys if Admin disabled in module config
-            $config = $this->wire('config');
-            $user = $this->wire('user');
-            $config->scripts->add($config->urls($this) . $lpk->className() . ".js");
-
-            // remove any existing session success to allow adding new passkeys
-            $session->removeFor('lpk', 'success');
-
-            $config->jsConfig('loginPassKey', [
-                'apiUrl' => 'https://' . $lpk->rp . $lpk->api_url,
-                'fn' => 'finduser',
-                'un' => $user->name,
-                'next' => 'register',
-            ]);
-        }
     }
 
     public function ___execute()
@@ -86,19 +68,6 @@ class ProcessLoginPassKey extends ProcessModule
         $pagination = $this->renderPagination();
 
         $form->set('value', $f->value . $this->getPassKeys($table, $checkbox) . $pagination);
-
-
-        /** @var InputfieldButton $f */
-        $lpk = $this->wire('modules')->get('LoginPassKey');
-        if ($lpk->enabledAdmin === 1) {
-            $f = wire('modules')->get('InputfieldButton');
-            $f->attr('name', 'btn');
-            $f->addClass(['top_button', 'add-passkey']);
-            $f->attr('value', "Add New");
-            $f->attr('href', '#');
-            $f->showInHeader(true);
-            $form->add($f);
-        }
 
         /** @var InputfieldButton $f */
         $f = $modules->get('InputfieldSubmit');
@@ -199,7 +168,6 @@ class ProcessLoginPassKey extends ProcessModule
 
     public function ___getPassKeys($table, $checkbox)
     {
-        $modules = $this->wire()->modules;
         $sanitizer = $this->wire('sanitizer');
         $users = $this->wire('users');
 
@@ -218,7 +186,6 @@ class ProcessLoginPassKey extends ProcessModule
             $table->row([$v->id, $v->user_id, $userName, $v->created, $checkbox->render(),]);
         }
         return $table->render();
-
     }
 
     public function ___install()

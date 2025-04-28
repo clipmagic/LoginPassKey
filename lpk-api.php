@@ -63,7 +63,6 @@ if ($post) {
 
             if(!empty($data->aarcreate)) {
                 $created = $page->lpkRegisterUser($user, $data->aarcreate);
-
                 bd($created, 'created');
 
                 if(!!$created) {
@@ -75,8 +74,6 @@ if ($post) {
                 $lpkData->msg = $page->lpkGetErrorMessage(2);
                 $lpkData->errno = 2;
             }
-            bd($lpkData, 'lpkData in register');
-            return \json_encode($lpkData);
             break;
 
         case 'verify':
@@ -87,22 +84,25 @@ if ($post) {
                 $lpkData->data->next = 'end';
 
             } else {
-                $verified = $page->lpkVerifyResponse($data->aarverify, $data->challenge);
+                $verified = $page->lpkVerifyResponse($data->aarverify, $data->challenge, $data->signedData);
 
                 $lpkData->data = $verified;
                 if ($verified->errno === 101) {
                     $lpkData->msg = $page->lpkGetErrorMessage(101);
+                    $lpkData->errno = $verified->errno;
                     $username = $session->getFor('lpk', 'username');
                     $feUser = $page->lpkGetUserByField($username);
                     $session->setFor('lpk', 'success', 'success');
                     $session->forceLogin($feUser);
-                    $lpkConfig = $modules->getConfig('LoginPassKey');
+
+                    $goToPage = $page->lpkGetRedirectUrl();
                     if($session->getFor('lpk', 'inadmin')) {
                         $processLogin = $modules->get('ProcessLogin');
                         $processLogin->execute();
-                    } elseif(!empty($lpkConfig['redirect_url'])) {
-                        $session->redirect($page->lpkGetRedirectURL());
-                    };
+                    } else {
+                        $lpkData->goto = !empty($goToPage) ? $goToPage : $pages->get(1)->httpUrl;
+                    }
+
                 }
             }
             break;
@@ -112,5 +112,5 @@ if ($post) {
         default:
             break;
     }
-    return json_encode($lpkData);
+    return \json_encode($lpkData);
 }

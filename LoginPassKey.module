@@ -178,7 +178,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field->name = 'redirect_url';
         $field->columnWidth	= 50;
         $field->label = $this->_("Page to redirect to on login (Frontend only)");
-        $field->value = "'/'";
+        $field->value = "/";
         $field->notes = $this->_("ID or path");
         if(!empty($data['redirect_url']))
             $field->value = $data['redirect_url'];
@@ -277,7 +277,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function lpkGetRedirectUrl(HookEvent $event)
     {
-        $event->return = $this->wire('pages')->get($this->redirect_url)->url;
+        $event->return = $this->getRedirectUrl();
     }
 
     public function lpkGetApiHttpUrl(HookEvent $event)
@@ -299,7 +299,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     public function lpkGetUserByField(HookEvent $event)
     {
         $username = $event->arguments(0);
-        $event->return = $this->_getUserByField($username);
+        $event->return = $this->getUserByField($username);
     }
 
     public function lpkGetErrorMessage(HookEvent $event)
@@ -383,13 +383,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $user = $this->wire('user');
 
         $lpk = $this->wire('modules')->get('LoginPassKey');
-        $modConfig = wire('modules')->getConfig($this);
-        $apiUrl = $modConfig['api_url'];
+        $apiUrl = $this->api_url;
 
-        $allowed = false;
-        foreach($modConfig['roles'] as $role) {
-            if($user->hasRole($role)) $allowed = true;
-        }
+        $allowed = $this->userAllowed($user);
 
         if ($allowed !== false) {
 
@@ -423,6 +419,14 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return 'https://' . $this->rp  .  $this->api_url;
     }
 
+    public function getRedirectUrl()
+    {
+        $sanitizer = $this->wire('sanitizer');
+        $pages = $this->wire('pages');
+        $pathOrId = \strpos($this->redirect_url,'/') !== false ? $sanitizer->text($this->redirect_url) : $sanitizer->int($this->redirect_url);
+
+        return $pages->get($pathOrId)->url;
+    }
 
     public function getDatabase()
     {
@@ -466,7 +470,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         $users = wire('users');
         $user = wire('user');
-        $feUser = $this->_getUserByField($username);
+        $feUser = $this->getUserByField($username);
 
         // Scenario 3
         if($feUser instanceof NullPage) {
@@ -480,11 +484,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
 
         // Now to see if the FE User is allowed to use WebAuthn
-        $allowed = false;
-        foreach($feUser->roles() as $role) {
-            if (in_array($role->id, $this->roles))
-                $allowed = true;
-        }
+        $allowed = $this->userAllowed($feUser);
+
         if(!$allowed) {
             $output->msg = $this->getErrorMessage(70);
             $output->errno = 70;
@@ -535,7 +536,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             return $output;
         }
 
-
         // The user is legit and permitted to use WebAuthn
         if($feUser->isGuest() ) {
             $count = $this->_checklpkDB($feUser);
@@ -545,7 +545,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $action = $count > 0 ? "verify" : "register";
             $output->un = $username;
             if($count > 0 ) {
-                $output->verifyArgs = $this->_prepareToValidate($feUser);
+                $output->verifyArgs = $this->prepareToValidate($feUser);
             }
             $output->fn = 'finduser';
             $output->next = $action;
@@ -559,13 +559,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return $output;
     }
 
-    private function _getUserByField($username)
+    public function getUserByField($username)
     {
         if(!$username instanceof User) {
             // it's the text-based name or email
             $sanitizer = $this->wire('sanitizer');
-            $modConfigData = $this->wire('modules')->getConfig($this);
-            $fld = $modConfigData['user_fld'];
+
+            $fld = $this->user_fld;
             $username = $sanitizer->text($username);
             $user = $this->wire('users')->get("name|$fld=$username");
         }
@@ -607,7 +607,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
     }
 
-    private function _prepareToValidate($user)
+    public function prepareToValidate($user)
     {
         $existingCredentials = $this->_getCredentialsFromDB($user);
         $lpkArgs = $this->getlpkargs();
@@ -624,7 +624,6 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
             foreach ($existingCredentials as $id) {
                 $tmp = new \stdClass();
-            //    $tmp->id = $id instanceof ByteBuffer ? $id : new ByteBuffer($id);  // binary
                 $tmp->id = $id;
                 $tmp->transports = $this->transports;
                 $tmp->type = 'public-key';
@@ -634,6 +633,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
         return $args;
     }
+
 
     private function _saveCredentialToDB($created)
     {
@@ -700,8 +700,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $args->publicKey->user->id = $user->id; // binary
 
         // Get the username or email address based on the User object
-        $modConfigData = $this->wire('modules')->getConfig($this);
-        $fld = $modConfigData['user_fld'];
+        $fld = $this->user_fld;
         $username = $user->$fld;
 
         $args->publicKey->user->name = $username;
@@ -845,6 +844,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         // didn't find a matching passkey
         if(empty($userPassKey)) {
+            $output->msg = _('Failed to verify user passkey');
             return $output;
         }
 
@@ -856,27 +856,38 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
             // no clientdatajson from the device
             $clientData = \json_decode($clientDataJSON);
-            if(!$clientData)
+            if(!$clientData) {
+                $output->msg = _('Failed to decode client data');
                 return $output;
+            }
 
             // relying party hosts don't match
-            if($clientData->origin !== "https://" . $getArgs->rp)
+            if($clientData->origin !== "https://" . $getArgs->rp) {
+                $output->msg = _('Failed to decode client data');
                 return $output;
+            }
 
             // challenges dont match
             $clientChallenge = \rtrim($challenge, "=");
-            if($clientChallenge !== $clientData->challenge)
+            if($clientChallenge !== $clientData->challenge) {
+                $output->msg = _('Challenge did not match');
                 return $output;
+            }
 
             // credential id's don't match
-            if($credData->id !== $userPassKey['credential_id'])
+            if($credData->id !== $userPassKey['credential_id']) {
+                $output->msg = _('Credential ID did not match');
                 return $output;
+            }
 
             // device failed to sign the request
-            if(!$credData->response->signature)
+            if(!$credData->response->signature) {
+                $output->msg = _('Signature not created');
                 return $output;
+            }
 
             if (strpos($userPassKey['public_key'], 'BEGIN PUBLIC KEY') === false) {
+                $output->msg = _('Public key not created');
                 $publicKey = $this->publicKeyToPem($userPassKey['public_key']);
             } else {
                 $publicKey = $userPassKey['public_key'];
@@ -888,11 +899,10 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $key = openssl_pkey_get_public($publicKey);
 
             if (!$key) {
+                $output->msg = _('Failed to open public key');
                 return $output;
             } else {
                 $isValid = openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
-//                bd($isValid, 'isValid');
-//                bd(\openssl_error_string(), 'error msg');
                 if(!$isValid === 1) {
                     return $output;
                 }
@@ -936,7 +946,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     # Utility functions
     #---------------------
 
-    public function getErrorMessage(int $mgsNumber = 99)
+    public function getErrorMessage($mgsNumber = 99)
     {
         switch ($mgsNumber) {
             case 1:
@@ -1006,6 +1016,16 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return "-----BEGIN PUBLIC KEY-----\n" . $pemBody . "-----END PUBLIC KEY-----\n";
     }
 
+    function userAllowed(User $user)
+    {
+        // Now to see if the FE User is allowed to use WebAuthn
+        $allowed = false;
+        foreach($user->roles as $role) {
+            if (in_array($role->id, $this->roles))
+                $allowed = true;
+        }
+        return $allowed;
+    }
     #---------------------
     # Install and Uninstall
     #---------------------

@@ -78,17 +78,29 @@ The match to these scenarios triggers one of three possible actions:
 2. Go through the passkey registration process
 3. Verify the passkey and log in the user
 
+<a id="verification"></a>
+## Verification
+After a user enters their passkey (eg, fingerprint) to login, the following are checked:
+- the *Challenge*
+- the *Client data*
+- the *Public key*
+- the *Signature* returned by the device. This is a much tougher nut to crack than a salted password.
+- the *User id*
+
+Should any of the above tests fail, the user is denied access and to continue the login process, must enter their password.
+
 <a id="installation"></a>
 ## Installation
 During the installation process, the module creates:
 - The Api template. The default name is `lkp-api` that includes attributes such as:
   - one page only, 
   - no children,
-  - urlSegments `start`, `register`, `verify` and `end`, and
+  - urlSegments `start`, `register`, `verify` and `end`,
+  - content type of `application-json`, and
   - disables appending of `_main.php`.
 - A publicly accessible page which is assigned the `lkp-api` template and is `hidden`.
 - It is then up to you to create a login page. See `examples/loginpasskey-page-tpl.php` for inspiration.
-- An admin page under `Access` to view/add/delete passkeys depending on user permissions.
+- An admin page under `Access` to view a list of users who have passkeys and delete passkeys depending on user permissions.
 
 <a id="configuration"></a>
 ## Configuration
@@ -109,13 +121,14 @@ The module configuration fields are:
 - **Identify user by username or email** (required) - defaults to the user template name field. After saving and the user template has email fields, those fields will become available. When choosing an email field, the user may login with their passkey with either their username OR email address in the input field.
 - **User roles permitted to use WebAuthn** (required) - Select all roles for all users. Superuser role MUST be selected to enable Superusers to log in with a passkey. The permission is not set by default.
 - **Path to your API ENDPOINT** (required) - The module will create a template and page for the api by default. Change this path should you prefer another endpoint.
+- **Page to redirect to on login (Frontend only)** - enter the ID or path to the page the user should be directed on frontend login. When blank, the user will be shown the `Home` page.
 
 <a id="customising-the-frontend"></a>
 ## Customising the frontend
 
 **Frontend page template** - see `loginpasskey-page-tpl.php` in the `examples` folder. The script MUST be present but the layout can be whatever you choose. The id attribute of the button MUST match the `getElementById` selector.
 
-**LoginPassKey with LoginRegisterPro** - Coming soon
+**LoginPassKey with LoginRegisterPro** - Requires a hook in `site\ready.php` see `loginpasskey-for-loginregisterpro-hook` in the `examples` folder. The script MUST be present but the layout can be whatever you choose. The id attribute of the button MUST match the `getElementById` selector. The CSS and associated script to trigger the transitions, are in the second `Page::render` hook. You can remove this hook and add the styles and script to your own files.
 
 **Api template** - see `loginpasskey-api-tpl.php` in the `examples` folder. **Changing this template will almost certainly break the application and is unsupported!**
 
@@ -125,7 +138,11 @@ When logged into the admin area, a user who is a superuser or has the `passkeys`
 
 Users with this permission can view and/or delete existing passkeys.  The list only shows `id`, `user id`, `username` and date `created`. It does not display any passkey authentication data.
 
-If `Enable Admin Passkey login` is checked, users with this permission can also add their own new passkeys.
+<a id="important"></a>
+## IMPORTANT
+1. LoginPassKey uses technology available in all the big 4 browsers - Chrome, Edge, Firefox and Safari - in versions later than 2023. Older browsers may struggle.
+2. Do NOT enable TracyDebugger DebugBar for the frontend when testing. The frontend javascripts will conflict. Instead, see https://processwire.com/talk/topic/31110-tracydebugger-session-challenge-conflict/#comment-248134 on how to set up TracyDebugger to monitor frontend guest https requests.
+3. The test page will fail if you have LoginRegisterPro installed along with it's associated `site/ready.php` hook. Simply comment out the hook in `site/ready.php` and try the test page again. You won't be logged in, it's simply a proof of concept.
 
 <a id="credit-where-its-due"></a>
 ## Credit where it's due

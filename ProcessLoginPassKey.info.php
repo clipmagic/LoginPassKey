@@ -15,7 +15,7 @@
 $info = [
     'title' => 'ProcessLoginPassKey',
     'summary' => 'Manage your LoginPassKeys',
-    'version' => '0.0.2Beta',
+    'version' => '0.0.3Beta',
     'author' => 'Clip Magic',
     'icon' => 'key',
     'requires' =>[ "ProcessWire>=3.0.246,", "LoginPassKey"],
@@ -24,7 +24,7 @@ $info = [
     'href' => 'https://processwire.com/modules/process-hello/',
     'permission' => 'passkeys',
     'permissions' => [
-        'passkeys' => 'Add or remove passkeys'
+        'passkeys' => 'Remove passkeys'
     ],
     'page' => [
         'name' => 'manage-passkeys',

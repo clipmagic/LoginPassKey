@@ -22,6 +22,7 @@ let lpk = {
         let pathArray = url.split('/');
         let urlSegment = pathArray.pop();
 
+
         // check browser support
         if (!window.fetch || !navigator.credentials || !navigator.credentials.create) {
             $data = {
@@ -32,7 +33,6 @@ let lpk = {
              return await connectPost(data,url).then(
                  (res) => {
                      if (res.end) return res
-
                  }
              )
         }
@@ -57,6 +57,10 @@ let lpk = {
                 break;
 
             case 'finduser':
+                if (typeof fwd === 'string') {
+                    fwd = JSON.parse(fwd)
+                }
+
                 data = {
                     fn: 'finduser',
                     next: fwd.data.next,
@@ -77,7 +81,7 @@ let lpk = {
                 if (typeof fwd === 'string') {
                     fwd = JSON.parse(fwd)
                 }
-console.log('fwd', fwd)
+
                 let pk = fwd.data.pk
 
                 pk.publicKey.user.id  = encoder.encode(pk.publicKey.user.id ).buffer;
@@ -100,7 +104,6 @@ console.log('fwd', fwd)
                }
 
                 if(cred) {
-
                     data = {
                         fn: 'register',
                         next: 'end',
@@ -129,7 +132,6 @@ console.log('fwd', fwd)
                 if (typeof fwd === 'string') {
                     fwd = JSON.parse(fwd)
                 }
-                console.log(fwd)
 
                 let va = fwd.data.verifyArgs
                 va.publicKey.challenge  = encoder.encode(va.publicKey.challenge).buffer;
@@ -146,8 +148,6 @@ console.log('fwd', fwd)
 
                 if(cred) {
                     const clientDataHash = await crypto.subtle.digest("SHA-256", cred.response.clientDataJSON);
-                    console.log('clientDataHash', clientDataHash)
-
                     const signedData = new Uint8Array(cred.response.authenticatorData.byteLength + clientDataHash.byteLength);
                     signedData.set(new Uint8Array(cred.response.authenticatorData), 0);
                     signedData.set(new Uint8Array(clientDataHash), cred.response.authenticatorData.byteLength);
@@ -184,8 +184,6 @@ console.log('fwd', fwd)
 
             case 'end':
                 if(fwd) {
-
-                    // TODO resolve why register and verify return different objects in end
                     result = {}
                     result.end = true
                     if(fwd && fwd.msg)
@@ -194,17 +192,12 @@ console.log('fwd', fwd)
                         result.error = fwd.error
                     if(fwd && fwd.un)
                         result.un = fwd.un
-                    if(fwd && fwd.errno)
+                    if(fwd && fwd.errno) {
                         result.errno = fwd.errno
-
-                    if(fwd && fwd.data && fwd.data.msg)
-                        result.msg = fwd.data.msg
-                    if(fwd && fwd.data && fwd.data.error)
-                        result.error = fwd.data.error
-                    if(fwd && fwd.data && fwd.data.un)
-                        result.un = fwd.data.un
-                    if(fwd && fwd.data && fwd.data.errno)
-                        result.errno = fwd.data.errno
+                        if(fwd.errno === 101 && fwd.goto) {
+                            window.location.href = fwd.goto
+                        }
+                    }
                     return result
                 }
                 break;
@@ -219,17 +212,22 @@ console.log('fwd', fwd)
         data.fn = 'register'
         data.end = 'end'
 
-        await lpk.action(`${apiUrl}register`, data).then (fwd => {
+        await lpk.action("`${apiUrl}register`", data).then (fwd => {
             result = {}
             result.end = true
-            if(fwd && fwd.msg)
-                result.msg = fwd.msg
-            if(fwd && fwd.error)
-                result.error = fwd.error
-            if(fwd && fwd.un)
-                result.un = fwd.un
-            if(fwd && fwd.errno)
-                result.errno = fwd.errno
+
+            if(fwd) {
+                if (fwd.msg)
+                    result.msg = fwd.msg
+                if (fwd.error)
+                    result.error = fwd.error
+                if (fwd.un)
+                    result.un = fwd.un
+                if (fwd.errno) {
+                    result.errno = fwd.errno
+                }
+
+            }
             console.log(result)
             return result
         })

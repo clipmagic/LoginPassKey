@@ -5,14 +5,27 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="e69aaa26-14a0-4a52-8512-ecd089f971ab" name="Changes" comment="updated">
+      <change beforePath="$PROJECT_DIR$/.idea/php.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/php.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025,_9_26 am_[Changes]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_13_4_2025__9_26am__Changes_.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_52 pm_[Changes]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_4_59 pm_[Changes]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025,_5_12 pm_[Changes]/shelved.patch" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_52pm__Changes_.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__4_59pm__Changes_.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_1_4_2025__5_12pm__Changes_.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/LoginPassKey.module" beforeDir="false" afterPath="$PROJECT_DIR$/LoginPassKey.module" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/loginpassk-for-loginregisterpro-hook.php" beforeDir="false" afterPath="$PROJECT_DIR$/examples/loginpassk-for-loginregisterpro-hook.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/loginpasskey-api-tpl.php" beforeDir="false" afterPath="$PROJECT_DIR$/examples/loginpasskey-api-tpl.php" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/lpk-api.php" beforeDir="false" afterPath="$PROJECT_DIR$/lpk-api.php" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="ComposerSettings" synchronizationState="SYNCHRONIZE">
+  <component name="ComposerSettings" notifyAboutMissingVendor="false" synchronizationState="SYNCHRONIZE">
     <pharConfigPath>$PROJECT_DIR$/composer.json</pharConfigPath>
     <execution />
   </component>
@@ -43,11 +56,7 @@
     &quot;accountId&quot;: &quot;e7c8d009-4c25-4a53-8252-496a1b1de7b8&quot;
   }
 }</component>
-  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/opt/homebrew/Cellar/php/8.3.2/bin/php">
-    <include_path>
-      <path value="$PROJECT_DIR$/vendor/composer" />
-    </include_path>
-  </component>
+  <component name="PhpWorkspaceProjectConfiguration" interpreter_name="/opt/homebrew/Cellar/php/8.3.2/bin/php" />
   <component name="ProblemsViewState">
     <option name="selectedTabId" value="CurrentFile" />
   </component>
@@ -97,6 +106,12 @@
       <workItem from="1743483745338" duration="3187000" />
       <workItem from="1743486945856" duration="986000" />
       <workItem from="1744514682275" duration="3577000" />
+      <workItem from="1744867302027" duration="1239000" />
+      <workItem from="1745295328394" duration="564000" />
+      <workItem from="1745295909965" duration="2092000" />
+      <workItem from="1745356048077" duration="534000" />
+      <workItem from="1745366185315" duration="1409000" />
+      <workItem from="1745580481553" duration="2034000" />
     </task>
     <task id="LOCAL-00001" summary="minor update">
       <option name="closed" value="true" />
@@ -242,7 +257,23 @@
       <option name="project" value="LOCAL" />
       <updated>1744522394671</updated>
     </task>
-    <option name="localTasksCounter" value="19" />
+    <task id="LOCAL-00019" summary="updated">
+      <option name="closed" value="true" />
+      <created>1744867423361</created>
+      <option name="number" value="00019" />
+      <option name="presentableId" value="LOCAL-00019" />
+      <option name="project" value="LOCAL" />
+      <updated>1744867423361</updated>
+    </task>
+    <task id="LOCAL-00020" summary="updated">
+      <option name="closed" value="true" />
+      <created>1745295986374</created>
+      <option name="number" value="00020" />
+      <option name="presentableId" value="LOCAL-00020" />
+      <option name="project" value="LOCAL" />
+      <updated>1745295986374</updated>
+    </task>
+    <option name="localTasksCounter" value="21" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -273,6 +304,7 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="minor update" />
+    <MESSAGE value="removed" />
     <MESSAGE value="updated" />
     <option name="LAST_COMMIT_MESSAGE" value="updated" />
   </component>
