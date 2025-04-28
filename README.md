@@ -130,6 +130,8 @@ The module configuration fields are:
 
 **LoginPassKey with LoginRegisterPro** - Requires a hook in `site\ready.php` see `loginpasskey-for-loginregisterpro-hook` in the `examples` folder. The script MUST be present but the layout can be whatever you choose. The id attribute of the button MUST match the `getElementById` selector. The CSS and associated script to trigger the transitions, are in the second `Page::render` hook. You can remove this hook and add the styles and script to your own files.
 
+**LoginPassKey with AppApi** - See `LoginPassKeyAppApi` in the `examples` folder. Copy this file to your AppApi `api` directory, update your `Routes.php` (instructions in example) and change the LoginPassKey API ENDPOINT in this module configuration.
+
 **Api template** - see `loginpasskey-api-tpl.php` in the `examples` folder. **Changing this template will almost certainly break the application and is unsupported!**
 
 <a id="loginpasskey-in-admin"></a>
