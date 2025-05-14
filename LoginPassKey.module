@@ -1124,7 +1124,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             "modified DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " .
             "PRIMARY KEY (id), " .
             "INDEX user_id_index (user_id) " .
-            ")";
+            ") ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8";
 
         $db = $this->getDatabase();
         return $db->exec($sql);
