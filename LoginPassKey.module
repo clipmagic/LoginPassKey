@@ -1115,7 +1115,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     protected function _createTable()
     {
-        $sql = "CREATE TABLE IF NOT EXISTS `" . $this->getTableName() . "` ( " .
+        $sql =  "DROP TABLE IF EXISTS `" . $this->getTableName() ."`;" .
+            "CREATE TABLE `" . $this->getTableName() . "`(".
             "id INT(10) NOT NULL AUTO_INCREMENT, " .
             "user_id INT(10) UNSIGNED NOT NULL, " .
             "credential_id TEXT NOT NULL UNIQUE, " .
@@ -1123,7 +1124,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             "created TIMESTAMP NOT NULL default CURRENT_TIMESTAMP, " .
             "PRIMARY KEY (id), " .
             "INDEX user_id_index (user_id) " .
-            ") ENGINE=MyISAM AUTO_INCREMENT=1 DEFAULT CHARSET=utf8";
+            ") CHARSET=utf8";
 
         $db = $this->getDatabase();
         return $db->exec($sql);
