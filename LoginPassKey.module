@@ -45,7 +45,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field = $modules->get('InputfieldMarkup');
         $field->name = 'header_text';
         $field->columnWidth = 100;
-        $field->markupText = _("After saving, if your User template(s) contain email fields, you'll be given the opportunity to select one. The user can then login with either their username or the selected email field address. Email addresses MUST be unique.");
+        $field->markupText = $this->_("After saving, if your User template(s) contain email fields, you'll be given the opportunity to select one. The user can then login with either their username or the selected email field address. Email addresses MUST be unique.");
         $fields->add($field);
 
 
@@ -844,7 +844,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         // didn't find a matching passkey
         if(empty($userPassKey)) {
-            $output->msg = _('Failed to verify user passkey');
+            $output->msg = $this->_('Failed to verify user passkey');
             return $output;
         }
 
@@ -857,37 +857,37 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             // no clientdatajson from the device
             $clientData = \json_decode($clientDataJSON);
             if(!$clientData) {
-                $output->msg = _('Failed to decode client data');
+                $output->msg = $this->_('Failed to decode client data');
                 return $output;
             }
 
             // relying party hosts don't match
             if($clientData->origin !== "https://" . $getArgs->rp) {
-                $output->msg = _('Failed to decode client data');
+                $output->msg = $this->_('Failed to decode client data');
                 return $output;
             }
 
             // challenges dont match
             $clientChallenge = \rtrim($challenge, "=");
             if($clientChallenge !== $clientData->challenge) {
-                $output->msg = _('Challenge did not match');
+                $output->msg = $this->_('Challenge did not match');
                 return $output;
             }
 
             // credential id's don't match
             if($credData->id !== $userPassKey['credential_id']) {
-                $output->msg = _('Credential ID did not match');
+                $output->msg = $this->_('Credential ID did not match');
                 return $output;
             }
 
             // device failed to sign the request
             if(!$credData->response->signature) {
-                $output->msg = _('Signature not created');
+                $output->msg = $this->_('Signature not created');
                 return $output;
             }
 
             if (strpos($userPassKey['public_key'], 'BEGIN PUBLIC KEY') === false) {
-                $output->msg = _('Public key not created');
+                $output->msg = $this->_('Public key not created');
                 $publicKey = $this->publicKeyToPem($userPassKey['public_key']);
             } else {
                 $publicKey = $userPassKey['public_key'];
@@ -899,7 +899,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $key = openssl_pkey_get_public($publicKey);
 
             if (!$key) {
-                $output->msg = _('Failed to open public key');
+                $output->msg = $this->_('Failed to open public key');
                 return $output;
             } else {
                 $isValid = openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
