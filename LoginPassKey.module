@@ -1119,8 +1119,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             "CREATE TABLE `" . $this->getTableName() . "`(".
             "id INT(10) NOT NULL AUTO_INCREMENT, " .
             "user_id INT(10) UNSIGNED NOT NULL, " .
-            "credential_id TEXT NOT NULL UNIQUE, " .
-            "public_key TEXT NOT NULL UNIQUE, " .
+            "credential_id TEXT NOT NULL, " .
+            "public_key TEXT NOT NULL, " .
             "created TIMESTAMP NOT NULL default CURRENT_TIMESTAMP, " .
             "PRIMARY KEY (id), " .
             "INDEX user_id_index (user_id) " .
