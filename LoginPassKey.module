@@ -435,7 +435,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function getTableName() : string
     {
-        return wire('sanitizer')->pageName($this->className());
+       // return wire('sanitizer')->pageName($this->className());
+        return $this->className(['lowercase']);
     }
 
     public function showUser()

@@ -63,7 +63,7 @@ if ($post) {
 
             if(!empty($data->aarcreate)) {
                 $created = $page->lpkRegisterUser($user, $data->aarcreate);
-                bd($created, 'created');
+//                bd($created, 'created');
 
                 if(!!$created) {
                     $session->setFor('lpk', 'success', 'success');
