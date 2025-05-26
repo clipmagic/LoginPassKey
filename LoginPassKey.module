@@ -845,7 +845,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         // didn't find a matching passkey
         if(empty($userPassKey)) {
-            $output->msg = $this->_('Failed to verify user passkey');
+            $output->msg = $this->_('Failed to verify passkey');
             return $output;
         }
 
@@ -916,7 +916,12 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                 $session->setFor('lpk', 'success', 'success');
                 $output->msg = $this->getErrorMessage(101);
                 $output->errno = 101;
+            } else {
+                $output->msg = $this->_('PassKey name does not match username');
+                $output->errno = 99;
             }
+
+
         }
         return $output;
     }

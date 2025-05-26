@@ -184,6 +184,9 @@ let lpk = {
 
             case 'end':
                 if(fwd) {
+                    if(fwd.data) {
+                        fwd = fwd.data
+                    }
                     result = {}
                     result.end = true
                     if(fwd && fwd.msg)

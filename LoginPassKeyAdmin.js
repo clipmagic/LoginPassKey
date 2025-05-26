@@ -15,14 +15,12 @@ function runOnStart() {
     btn.addEventListener('click', (e) => {
         e.preventDefault()
 
-
-
         lpk.action(`${apiUrl}start`).then (res => {
             console.log(res)
             if(res && res.errno) {
-                if(res.errno === 50 || res.errno === 4) {
+                if(res.errno !== 101) {
                     document.getElementById('end').textContent = res.msg
-                } else if(res.errno === 101) {
+                } else {
                     window.location.replace(window.location.href)
                 }
             }
