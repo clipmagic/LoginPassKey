@@ -97,9 +97,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         // Replying party host
         $field = $modules->get('InputfieldText');
         $field->name = 'rp';
-        $field->label = $this->_("Host name");
+        $field->label = $this->_("Host name (Replying Party)");
         $field->columnWidth	= 50;
-        $field->notes($this->_("Leave blank to default to config->host")) ;
+        $field->notes($this->_("Leave blank to default to config->host. Must match the URL defined in your .htaccess file, eg with/without 'www'"));
         $field->value = !empty($data['rp']) ? $sanitizer->text($data['rp']) : $this->wire('config')->httpHost;
         $fieldset->add($field);
         $fields->add($fieldset);
