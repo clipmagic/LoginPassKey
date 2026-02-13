@@ -77,6 +77,18 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
         $fieldset->add($field);
 
+        // Enable usernameless (discoverable credentials) login
+        $field = $modules->get('InputfieldCheckbox');
+        $field->name = 'enableUsernameless';
+        $field->value = null;
+        $field->columnWidth = 50;
+        $field->label = $this->_("Enable login without username");
+        $field->notes = $this->_("Allows users to login with passkey without entering their username first (Discoverable Credentials)");
+        if (isset($data['enableUsernameless']) && $data['enableUsernameless'] !== '') {
+            $field->value = $data['enableUsernameless'];
+            $field->attr('checked', 'checked');
+        }
+        $fieldset->add($field);
 
         $fields->add($fieldset);
 
@@ -251,6 +263,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $this->addHook('Page::lpkGetUserByField', $this, 'lpkGetUserByField');
         $this->addHook('Page::lpkVerifyResponse', $this, 'lpkVerifyResponse');
         $this->addHook('Page::lpkGetErrorMessage', $this, 'lpkGetErrorMessage');
+        $this->addHook('Page::lpkDiscoverLogin', $this, 'lpkDiscoverLogin');
+        $this->addHook('Page::lpkFindUserByCredentialId', $this, 'lpkFindUserByCredentialId');
+        $this->addHook('Page::lpkVerifyDiscoverResponse', $this, 'lpkVerifyDiscoverResponse');
     }
 
     public function ___ready() : void
@@ -308,6 +323,25 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $event->return = $this->getErrorMessage($errormsg);
     }
 
+    public function lpkDiscoverLogin(HookEvent $event)
+    {
+        $event->return = $this->discoverLogin();
+    }
+
+    public function lpkFindUserByCredentialId(HookEvent $event)
+    {
+        $credentialId = $event->arguments(0);
+        $event->return = $this->findUserByCredentialId($credentialId);
+    }
+
+    public function lpkVerifyDiscoverResponse(HookEvent $event)
+    {
+        $credData = $event->arguments(0);
+        $challenge = $event->arguments(1);
+        $signedData = $event->arguments(2);
+        $event->return = $this->verifyDiscoverResponse($credData, $challenge, $signedData);
+    }
+
     public function lpkRegisterUser(HookEvent $event)
     {
         $user = $event->arguments(0);
@@ -348,26 +382,37 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $form = $event->return;
         $modules = $this->wire('modules');
 
-        $passKeyButton = $modules->get('InputfieldButton');
-        $passKeyButton->attr('id+name', 'lpk');
-        $passKeyButton->addClass('top_button');
-        $passKeyButton->attr('value', $this->_("Login with PassKey"));
-        $passKeyButton->icon = 'key';
-        $passKeyButton->attr('href', '#');
-        $form->add($passKeyButton);
+        // Check if usernameless login is enabled
+        $usernamelessEnabled = !empty($this->enableUsernameless);
+
+        if ($usernamelessEnabled) {
+            // Usernameless PassKey login (discoverable credentials)
+            $discoverButton = $modules->get('InputfieldButton');
+            $discoverButton->attr('id+name', 'lpk-discover');
+            $discoverButton->addClass('top_button');
+            $discoverButton->attr('value', $this->_("Login with PassKey"));
+            $discoverButton->icon = 'key';
+            $discoverButton->attr('href', '#');
+            $form->add($discoverButton);
+        } else {
+            // Original button: Login with PassKey (requires username)
+            $passKeyButton = $modules->get('InputfieldButton');
+            $passKeyButton->attr('id+name', 'lpk');
+            $passKeyButton->addClass('top_button');
+            $passKeyButton->attr('value', $this->_("Login with PassKey"));
+            $passKeyButton->icon = 'key';
+            $passKeyButton->attr('href', '#');
+            $form->add($passKeyButton);
+        }
 
         $markUp = $modules->get('InputfieldMarkup');
         $markUp->attr('id+name', 'end');
 
         $html = "<div id='end' class='uk-margin'></div>";
-        $modules = $this->wire('modules');
-//        $apiUrl = $modules->getConfig('LoginPassKey')['api_url'];
 
         $apiUrl = $this->getApiHttpUrl();
 
         $html .= "<script>let apiUrl = '$apiUrl'</script>";
-//        $html .= "if(!apiUrl)";
-//        $html .= "let apiUrl = '$apiUrl'</script>";
         $markUp->value = $html;
         $form->add($markUp);
 
@@ -647,12 +692,12 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $sql = <<<SQL
             INSERT INTO {$this->getTableName()}
             (
-             user_id, 
+             user_id,
              credential_id,
              public_key
-             ) 
-            VALUES 
-            ( 
+             )
+            VALUES
+            (
              :user_id,
              :credential_id,
              :public_key
@@ -1032,6 +1077,185 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
         return $allowed;
     }
+
+    #---------------------
+    # Discoverable Credentials (Usernameless) Login
+    #---------------------
+
+    /**
+     * Prepare arguments for discoverable credentials login (no username required)
+     * @return object
+     */
+    public function discoverLogin()
+    {
+        $lpkArgs = $this->getlpkargs();
+
+        $args = new \stdClass();
+        $args->publicKey = new \stdClass();
+        $args->publicKey->timeout = 600000; // microseconds
+        $args->publicKey->challenge = $this->_createChallenge();
+        $args->publicKey->userVerification = $this->userVerification;
+        $args->publicKey->rpId = $lpkArgs->rp;
+        // Empty allowCredentials triggers discoverable credentials
+        $args->publicKey->allowCredentials = [];
+
+        return $args;
+    }
+
+    /**
+     * Find user by credential ID from the database
+     * @param string $credentialId
+     * @return User|NullPage
+     */
+    public function findUserByCredentialId($credentialId)
+    {
+        try {
+            $db = wire('database');
+            $sql = "SELECT `user_id` FROM " . $this->getTableName() . " WHERE `credential_id` = :credential_id LIMIT 1";
+            $query = $db->prepare($sql);
+            $query->bindParam(":credential_id", $credentialId);
+            $query->closeCursor();
+            $query->execute();
+            $result = $query->fetch(\PDO::FETCH_ASSOC);
+
+            if ($result && !empty($result['user_id'])) {
+                return $this->wire('users')->get((int)$result['user_id']);
+            }
+            return new NullPage();
+        } catch (WireException $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return new NullPage();
+        }
+    }
+
+    /**
+     * Verify a discoverable credential response (usernameless login)
+     * @param object $credData
+     * @param string $challenge
+     * @param string $signedData
+     * @return object
+     */
+    public function verifyDiscoverResponse($credData = null, $challenge = null, $signedData = null)
+    {
+        $output = new \stdClass();
+        $output->fn = 'discoververify';
+        $output->msg = $this->getErrorMessage(4);
+        $output->errno = 4;
+        $output->next = 'end';
+
+        if (empty($credData) || empty($credData->id)) {
+            return $output;
+        }
+
+        $sanitizer = $this->wire('sanitizer');
+        $session = $this->wire('session');
+
+        // Find user by credential ID
+        $feUser = $this->findUserByCredentialId($credData->id);
+
+        if ($feUser instanceof NullPage) {
+            $output->msg = $this->_('No user found for this passkey');
+            return $output;
+        }
+
+        // Check if user is allowed
+        $allowed = $this->userAllowed($feUser);
+        if (!$allowed) {
+            $output->msg = $this->getErrorMessage(70);
+            $output->errno = 70;
+            return $output;
+        }
+
+        // Get user's passkeys from DB
+        $userPassKeys = $this->_getCredentialsFromDB($feUser);
+        if (\count($userPassKeys) < 1) {
+            return $output;
+        }
+
+        $userPassKey = '';
+        foreach ($userPassKeys as $passKey) {
+            if ($passKey['credential_id'] === $credData->id) {
+                $userPassKey = $passKey;
+                break;
+            }
+        }
+
+        if (empty($userPassKey)) {
+            $output->msg = $this->_('Failed to verify passkey');
+            return $output;
+        }
+
+        // Verify the credential
+        if (!empty($credData)) {
+            $getArgs = $this->getlpkargs();
+            $clientDataJSON = $this->base64url_decode($credData->response->clientDataJSON);
+
+            $clientData = \json_decode($clientDataJSON);
+            if (!$clientData) {
+                $output->msg = $this->_('Failed to decode client data');
+                return $output;
+            }
+
+            if ($clientData->origin !== "https://" . $getArgs->rp) {
+                $output->msg = $this->_('Origin mismatch');
+                return $output;
+            }
+
+            $clientChallenge = \rtrim($challenge, "=");
+            if ($clientChallenge !== $clientData->challenge) {
+                $output->msg = $this->_('Challenge did not match');
+                return $output;
+            }
+
+            if ($credData->id !== $userPassKey['credential_id']) {
+                $output->msg = $this->_('Credential ID did not match');
+                return $output;
+            }
+
+            if (!$credData->response->signature) {
+                $output->msg = $this->_('Signature not created');
+                return $output;
+            }
+
+            if (strpos($userPassKey['public_key'], 'BEGIN PUBLIC KEY') === false) {
+                $publicKey = $this->publicKeyToPem($userPassKey['public_key']);
+            } else {
+                $publicKey = $userPassKey['public_key'];
+            }
+
+            $signedData = $this->base64url_decode($signedData);
+            $signature = $this->base64url_decode($credData->response->signature);
+
+            $key = openssl_pkey_get_public($publicKey);
+
+            if (!$key) {
+                $output->msg = $this->_('Failed to open public key');
+                return $output;
+            }
+
+            $isValid = openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
+            if ($isValid !== 1) {
+                return $output;
+            }
+
+            // Verify user handle matches
+            $userHandle = $sanitizer->int($this->base64url_decode($credData->response->userHandle));
+
+            if ($feUser->id === $userHandle && $isValid === 1) {
+                $session->setFor('lpk', 'success', 'success');
+                $session->setFor('lpk', 'userid', $feUser->id);
+                $output->msg = $this->getErrorMessage(101);
+                $output->errno = 101;
+                $output->userid = $feUser->id;
+            } else {
+                $output->msg = $this->_('PassKey user handle does not match');
+                $output->errno = 99;
+            }
+        }
+
+        return $output;
+    }
+
     #---------------------
     # Install and Uninstall
     #---------------------
@@ -1066,7 +1290,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $template->filename = $this->config->paths->templates . 'lpk-api.php';
             $template->noChildren = 1;
             $template->noParents = -1; // one page only
-            $template->urlSegments = "start register verify end";
+            $template->urlSegments = "start register verify end discoverstart discoververify";
             $template->contentType = "json";
             $template->https = 1; // always only https
             $template->noAppendTemplateFile = 1; // disable auto-append of eg _main.php

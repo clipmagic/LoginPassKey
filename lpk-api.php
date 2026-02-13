@@ -24,6 +24,44 @@ if ($post) {
     $lpkData->data = $data;
 
     switch ($next) {
+        case 'discoverstart':
+            // Start usernameless login - prepare discoverable credentials request
+            $lpkData->data = new \stdClass();
+            $lpkData->data->discoverArgs = $page->lpkDiscoverLogin();
+            $lpkData->data->next = 'discoververify';
+            break;
+
+        case 'discoververify':
+            // Verify discoverable credential response (usernameless login)
+            if (($data->errno && $data->errno !== 101) || \is_null($data->aarverify)) {
+                $lpkData->msg = $page->lpkGetErrorMessage($data->errno ?? 4);
+                $lpkData->errno = $data->errno ?? 4;
+                $lpkData->data->next = 'end';
+            } else {
+                $verified = $page->lpkVerifyDiscoverResponse($data->aarverify, $data->challenge, $data->signedData);
+                $lpkData->data = $verified;
+
+                if ($verified->errno === 101) {
+                    $lpkData->msg = $page->lpkGetErrorMessage(101);
+                    $lpkData->errno = $verified->errno;
+
+                    // Find and login the user by their ID from verification
+                    $feUser = $users->get($verified->userid);
+                    if ($feUser instanceof User && !$feUser instanceof NullPage) {
+                        $session->forceLogin($feUser);
+
+                        $goToPage = $page->lpkGetRedirectUrl();
+                        if ($session->getFor('lpk', 'inadmin')) {
+                            $processLogin = $modules->get('ProcessLogin');
+                            $processLogin->execute();
+                        } else {
+                            $lpkData->goto = !empty($goToPage) ? $goToPage : $pages->get(1)->httpUrl;
+                        }
+                    }
+                }
+            }
+            break;
+
         case 'finduser':
 
             // Kick off the process

@@ -9,6 +9,108 @@ let lpk = {
     hello: () => {
         console.log("hello")
     },
+
+    // Usernameless (discoverable credentials) login
+    discoverLogin: async (apiUrl) => {
+        const encoder = new TextEncoder()
+
+        // Check browser support
+        if (!window.fetch || !navigator.credentials || !navigator.credentials.get) {
+            return {
+                fn: 'end',
+                next: 'end',
+                errno: 1,
+                msg: 'Browser does not support WebAuthn'
+            }
+        }
+
+        try {
+            // Step 1: Get challenge from server
+            const startResponse = await connectPost({ fn: 'discoverstart' }, `${apiUrl}discoverstart`)
+            if (!startResponse || !startResponse.data || !startResponse.data.discoverArgs) {
+                return {
+                    fn: 'end',
+                    next: 'end',
+                    errno: 4,
+                    msg: 'Failed to get discover login args'
+                }
+            }
+
+            let discoverArgs = startResponse.data.discoverArgs
+            discoverArgs.publicKey.challenge = encoder.encode(discoverArgs.publicKey.challenge).buffer
+
+            // Step 2: Get credentials from authenticator (browser will show available passkeys)
+            let cred
+            try {
+                cred = await navigator.credentials.get(discoverArgs)
+            } catch (err) {
+                if (err instanceof DOMException) {
+                    console.log('Discover login cancelled by user')
+                    return {
+                        fn: 'end',
+                        next: 'end',
+                        errno: 4,
+                        msg: 'Login cancelled'
+                    }
+                }
+                throw err
+            }
+
+            if (!cred) {
+                return {
+                    fn: 'end',
+                    next: 'end',
+                    errno: 4,
+                    msg: 'No credential received'
+                }
+            }
+
+            // Step 3: Verify with server
+            const clientDataHash = await crypto.subtle.digest("SHA-256", cred.response.clientDataJSON)
+            const signedData = new Uint8Array(cred.response.authenticatorData.byteLength + clientDataHash.byteLength)
+            signedData.set(new Uint8Array(cred.response.authenticatorData), 0)
+            signedData.set(new Uint8Array(clientDataHash), cred.response.authenticatorData.byteLength)
+
+            const verifyData = {
+                fn: "discoververify",
+                next: "end",
+                aarverify: await cred.toJSON(),
+                challenge: credToJSON(discoverArgs.publicKey.challenge),
+                signedData: bufferToBase64url(signedData),
+                errno: 101
+            }
+
+            const verifyResponse = await connectPost(verifyData, `${apiUrl}discoververify`)
+
+            if (verifyResponse && verifyResponse.data) {
+                if (verifyResponse.data.errno === 101 && verifyResponse.goto) {
+                    window.location.href = verifyResponse.goto
+                }
+                return {
+                    end: true,
+                    errno: verifyResponse.data.errno,
+                    msg: verifyResponse.data.msg || verifyResponse.msg
+                }
+            }
+
+            return {
+                fn: 'end',
+                next: 'end',
+                errno: 4,
+                msg: 'Verification failed'
+            }
+
+        } catch (error) {
+            console.error('Discover login error:', error)
+            return {
+                fn: 'end',
+                next: 'end',
+                errno: 4,
+                msg: error.message || 'Unknown error'
+            }
+        }
+    },
+
     action: async (url, fwd= null) => {
 
         const encoder = new TextEncoder()

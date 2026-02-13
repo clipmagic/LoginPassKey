@@ -45,6 +45,7 @@ In short, passkeys offer improved security and convenience compared to tradition
 - Simply install, then configure the module and it's good to go
 - The module does not require TFA and will probably conflict if TFA is installed
 - The module does not make any changes to the user template
+- Optional: Usernameless login using Discoverable Credentials - users can login without entering their username first
 
 <a id="how-it-works-short-version"></a>
 ## How it works (Short version)
@@ -56,6 +57,15 @@ The browser, server and device have a 3-way conversation answering the following
 The user must be **logged in with a password to register a passkey**.
 
 The user must be **logged out to verify an existing passkey**.
+
+### Usernameless Login (Discoverable Credentials)
+When enabled, the login flow changes:
+1. User clicks the "Login with PassKey" button (no username required)
+2. Browser displays all available passkeys for this site
+3. User selects their passkey and authenticates (fingerprint, Face ID, etc.)
+4. Server identifies the user by the credential ID and logs them in
+
+This provides a streamlined login experience where users don't need to remember or type their username.
 <a id="how-it-works-long-version-tldr"></a>
 ## How it works (Long version TLDR;)
 The user clicks a button, then:
@@ -95,7 +105,7 @@ During the installation process, the module creates:
 - The Api template. The default name is `lkp-api` that includes attributes such as:
   - one page only, 
   - no children,
-  - urlSegments `start`, `register`, `verify` and `end`,
+  - urlSegments `start`, `register`, `verify`, `end`, `discoverstart` and `discoververify`,
   - content type of `application-json`, and
   - disables appending of `_main.php`.
 - A publicly accessible page which is assigned the `lkp-api` template and is `hidden`.
@@ -109,6 +119,7 @@ The module configuration fields are:
 ### Activate module
 - **Enable Frontend Passkey login** - check to allow frontend users to login with a passkey.
 - **Enable Admin Passkey login** - check to allow admins to login with a passkey.
+- **Enable login without username** - check to allow users to login with their passkey without entering their username first. This uses WebAuthn Discoverable Credentials, where the browser shows all available passkeys for the site and the user selects which one to use.
 
 <a id="authentication-options"></a>
 ### Authentication options
