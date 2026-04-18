@@ -15,7 +15,8 @@ require_once __DIR__ . '/LoginPassKeyAppApi.php';
     ['POST', 'finduser', LoginPassKeyAppApi::class, 'findUser'],
     ['POST', 'register', LoginPassKeyAppApi::class, 'register'],
     ['POST', 'verify',   LoginPassKeyAppApi::class, 'verify'],
-    ['POST', 'end',      LoginPassKeyAppApi::class, 'end']
+    ['POST', 'end',      LoginPassKeyAppApi::class, 'end'],
+    ['POST', 'isRegistered',  LoginPassKeyAppApi::class, 'isAlreadyRegistered'] //optional
 ]
 
  * then change the API ENDPOINT in the LoginPassKey module configuration to /api/lpk/
@@ -36,6 +37,19 @@ class LoginPassKeyAppApi
         $lpkData = new \stdClass();
         $lpkData->data = $data;
         return $lpkData;
+    }
+
+    public static function isAlreadyRegistered($data) :\stdClass | bool
+    {
+        $modules = wire('modules');
+        if(!$modules->isInstalled('LoginPassKey')) return false;
+        $lpk = $modules->get('LoginPassKey');
+
+        $dbResponse = $lpk->hasUserPasskeysRegistered(wire('input')->post("username"));
+
+        $response = new \stdClass();
+        $response->isAlreadyRegistered = $dbResponse;
+        return $response;
     }
 
     public static function findUser($data) :\stdClass | bool
