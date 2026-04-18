@@ -9,7 +9,7 @@ let lpk = {
     hello: () => {
         console.log("hello")
     },
-    action: async (url, fwd= null) => {
+    action: async (url, fwd= null, startApiUrl= null, userName= null) => {
 
         const encoder = new TextEncoder()
         const decoder = new TextDecoder()
@@ -22,6 +22,10 @@ let lpk = {
         let pathArray = url.split('/');
         let urlSegment = pathArray.pop();
 
+        //backwards compatible
+        if (startApiUrl == null) {
+            startApiUrl = apiUrl;
+        }
 
         // check browser support
         if (!window.fetch || !navigator.credentials || !navigator.credentials.create) {
@@ -39,10 +43,16 @@ let lpk = {
 
         switch (urlSegment) {
             case 'start':
-                const userFld = document.getElementById('login_name')
+                let userNameInput;
+                if (userName !== null) {
+                    userNameInput = userName;
+                } else {
+                    let userField = document.getElementById('login_name');
+                    userNameInput = userField.value.trim();
+                }
                 // OK, start the process
                 data = {
-                    un: userFld.value.trim(),
+                    un: userNameInput,
                     fn: 'start',
                     next: 'finduser'
                 }
@@ -52,7 +62,7 @@ let lpk = {
                     .then(
                     (res) => {
                         if(res && res.end) return res
-                        return lpk.action(`${apiUrl}${data.next}`,res)
+                        return lpk.action(`${startApiUrl}${data.next}`,res)
                     } )
                 break;
 
@@ -73,7 +83,7 @@ let lpk = {
                     .then(
                         (res) => {
                             if(res.end) return res
-                            return lpk.action(`${apiUrl}${data.next}`,res)
+                            return lpk.action(`${startApiUrl}${data.next}`,res)
                         } )
                break;
 
@@ -123,7 +133,7 @@ let lpk = {
                     .then(
                         (res) => {
                             if(res && res.end) return res
-                            return lpk.action(`${apiUrl}${data.next}`,res)
+                            return lpk.action(`${startApiUrl}${data.next}`,res)
                         }
                     )
                 break;
@@ -178,13 +188,13 @@ let lpk = {
                         .then(
                             (res) => {
                                if(res && res.end) return res
-                                return lpk.action(`${apiUrl}${data.next}`, res)
+                                return lpk.action(`${startApiUrl}${data.next}`, res)
                             })
                 break;
 
             case 'end':
                 if(fwd) {
-                    if(fwd.data) {
+                    if(fwd.data && Object.keys(fwd.data).length > 0) {
                         fwd = fwd.data
                     }
                     result = {}
@@ -348,4 +358,3 @@ function bufferToBase64url(buffer) {
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 }
-
