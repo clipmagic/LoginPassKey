@@ -444,6 +444,19 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return $this->user;
     }
 
+    public function hasUserPasskeysRegistered(string $providedUsername) :bool
+    {
+        $feUser = $this->getUserByField($providedUsername);
+        if ($feUser->id == 0) return false;
+
+        $count = $this->_checklpkDB($feUser);
+
+        if ($count > 0) {
+            return true;
+        }
+        return false;
+    }
+
     public function findUser(mixed $username = null)
     {
         /*
