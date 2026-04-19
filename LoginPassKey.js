@@ -62,7 +62,7 @@ let lpk = {
                     .then(
                     (res) => {
                         if(res && res.end) return res
-                        return lpk.action(`${startApiUrl}${data.next}`,res)
+                        return lpk.action(`${startApiUrl}${data.next}`,res,startApiUrl)
                     } )
                 break;
 
@@ -83,7 +83,7 @@ let lpk = {
                     .then(
                         (res) => {
                             if(res.end) return res
-                            return lpk.action(`${startApiUrl}${data.next}`,res)
+                            return lpk.action(`${startApiUrl}${data.next}`,res,startApiUrl)
                         } )
                break;
 
@@ -133,7 +133,7 @@ let lpk = {
                     .then(
                         (res) => {
                             if(res && res.end) return res
-                            return lpk.action(`${startApiUrl}${data.next}`,res)
+                            return lpk.action(`${startApiUrl}${data.next}`,res,startApiUrl)
                         }
                     )
                 break;
@@ -188,7 +188,7 @@ let lpk = {
                         .then(
                             (res) => {
                                if(res && res.end) return res
-                                return lpk.action(`${startApiUrl}${data.next}`, res)
+                                return lpk.action(`${startApiUrl}${data.next}`,res,startApiUrl)
                             })
                 break;
 
