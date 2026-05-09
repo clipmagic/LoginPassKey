@@ -5,6 +5,21 @@
  * Email: admin@clipmagic.com.au
  */
 
+const lpkEndpointUrl = (url) => {
+    const [path, query] = url.split('?')
+    const normalizedPath = path.replace(/\/+$/, '')
+    return `${normalizedPath}/${query ? `?${query}` : ''}`
+}
+
+const lpkStepUrl = (step) => {
+    return lpkEndpointUrl(`${apiUrl.replace(/\/+$/, '')}/${step}`)
+}
+
+const lpkUrlSegment = (url) => {
+    const path = url.split('?')[0].replace(/\/+$/, '')
+    return path.split('/').pop()
+}
+
 let lpk = {
     hello: () => {
         console.log("hello")
@@ -19,20 +34,20 @@ let lpk = {
 
         // urlSegment refers to the urlSegment/endpoint of the api
         // initated with 'start' in the page template js
-        let pathArray = url.split('/');
-        let urlSegment = pathArray.pop();
+        url = lpkEndpointUrl(url)
+        let urlSegment = lpkUrlSegment(url)
 
 
         // check browser support
         if (!window.fetch || !navigator.credentials || !navigator.credentials.create) {
-            $data = {
+            const data = {
                 fn: 'end',
                 next: 'end',
                 errno: 1
             }
              return await connectPost(data,url).then(
                  (res) => {
-                     if (res.end) return res
+                     if (res && res.end) return res
                  }
              )
         }
@@ -41,18 +56,18 @@ let lpk = {
             case 'start':
                 const userFld = document.getElementById('login_name')
                 // OK, start the process
-                data = {
+                const startData = {
                     un: userFld.value.trim(),
                     fn: 'start',
                     next: 'finduser'
                 }
                 // Change the url to the next step in the process
-                url.replace(urlSegment, data.next)
-                return await connectPost(data,url)
+                url.replace(urlSegment, startData.next)
+                return await connectPost(startData,url)
                     .then(
                     (res) => {
                         if(res && res.end) return res
-                        return lpk.action(`${apiUrl}${data.next}`,res)
+                        return lpk.action(lpkStepUrl(startData.next),res)
                     } )
                 break;
 
@@ -61,25 +76,43 @@ let lpk = {
                     fwd = JSON.parse(fwd)
                 }
 
-                data = {
+                if (!fwd || !fwd.data) {
+                    return {
+                        end: true,
+                        errno: 500,
+                        msg: 'Passkey login failed before finduser returned usable data'
+                    }
+                }
+
+                const findUserData = {
                     fn: 'finduser',
                     next: fwd.data.next,
                     un: fwd.data.un
                 }
 
                 // Change the url to the next step in the process
-                url.replace(urlSegment, data.next)
-                 return await connectPost(data,url)
+                url.replace(urlSegment, findUserData.next)
+                 return await connectPost(findUserData,url)
                     .then(
                         (res) => {
-                            if(res.end) return res
-                            return lpk.action(`${apiUrl}${data.next}`,res)
+                            if(res && res.end) return res
+                            const next = res && res.data ? res.data.next : null
+                            if(!next || next === 'end') return lpk.action(lpkStepUrl('end'), res)
+                            return lpk.action(lpkStepUrl(next),res)
                         } )
                break;
 
             case 'register':
                 if (typeof fwd === 'string') {
                     fwd = JSON.parse(fwd)
+                }
+
+                if (!fwd || !fwd.data || !fwd.data.pk) {
+                    return {
+                        end: true,
+                        errno: 500,
+                        msg: 'Passkey registration failed before register returned usable data'
+                    }
                 }
 
                 let pk = fwd.data.pk
@@ -103,27 +136,28 @@ let lpk = {
                    }
                }
 
+                let registerData
                 if(cred) {
-                    data = {
+                    registerData = {
                         fn: 'register',
                         next: 'end',
                         aarcreate: await cred.toJSON()
                     }
                 } else {
-                    data = {
+                    registerData = {
                         fn: 'register',
                         next: 'end',
                         aarcreate: null
                     }
                 }
                 // Progress to the next step in the process
-                url.replace(urlSegment, data.next)
-                urlSegment = data.next
-                return await connectPost(data,url)
+                url.replace(urlSegment, registerData.next)
+                urlSegment = registerData.next
+                return await connectPost(registerData,url)
                     .then(
                         (res) => {
                             if(res && res.end) return res
-                            return lpk.action(`${apiUrl}${data.next}`,res)
+                            return lpk.action(lpkStepUrl(registerData.next),res)
                         }
                     )
                 break;
@@ -131,6 +165,14 @@ let lpk = {
             case 'verify':
                 if (typeof fwd === 'string') {
                     fwd = JSON.parse(fwd)
+                }
+
+                if (!fwd || !fwd.data || !fwd.data.verifyArgs) {
+                    return {
+                        end: true,
+                        errno: 500,
+                        msg: 'Passkey verification failed before verify returned usable data'
+                    }
                 }
 
                 let va = fwd.data.verifyArgs
@@ -146,13 +188,14 @@ let lpk = {
                     }
                 }
 
+                let verifyData
                 if(cred) {
                     const clientDataHash = await crypto.subtle.digest("SHA-256", cred.response.clientDataJSON);
                     const signedData = new Uint8Array(cred.response.authenticatorData.byteLength + clientDataHash.byteLength);
                     signedData.set(new Uint8Array(cred.response.authenticatorData), 0);
                     signedData.set(new Uint8Array(clientDataHash), cred.response.authenticatorData.byteLength);
 
-                    data = {
+                    verifyData = {
                         fn: "verify",
                         next: "end",
                         aarverify: await cred.toJSON(),
@@ -162,7 +205,7 @@ let lpk = {
                     }
 
                 } else {
-                    data = {
+                    verifyData = {
                         fn: "verify",
                         next: "end",
                         aarverify: null,
@@ -171,14 +214,14 @@ let lpk = {
                 }
 
                     // Change the url to the next step in the process
-                    url.replace(urlSegment, data.next)
-                    urlSegment = data.next
-                    return await connectPost(data, url)
+                    url.replace(urlSegment, verifyData.next)
+                    urlSegment = verifyData.next
+                    return await connectPost(verifyData, url)
                         // Change the url to the next step in the process
                         .then(
                             (res) => {
                                if(res && res.end) return res
-                                return lpk.action(`${apiUrl}${data.next}`, res)
+                                return lpk.action(lpkStepUrl(verifyData.next), res)
                             })
                 break;
 
@@ -187,7 +230,7 @@ let lpk = {
                     if(fwd.data) {
                         fwd = fwd.data
                     }
-                    result = {}
+                    let result = {}
                     result.end = true
                     if(fwd && fwd.msg)
                         result.msg = fwd.msg
@@ -216,7 +259,7 @@ let lpk = {
         data.end = 'end'
 
         await lpk.action("`${apiUrl}register`", data).then (fwd => {
-            result = {}
+            let result = {}
             result.end = true
 
             if(fwd) {
@@ -265,6 +308,7 @@ const connectPost = async (data, url) => {
 const connectPost = async (data, url) => {
     let body = JSON.stringify(data);
     try {
+        url = lpkEndpointUrl(url)
         let connect = await fetch(url, {
             method: "POST",
             headers: {
@@ -273,14 +317,17 @@ const connectPost = async (data, url) => {
             body: body
         });
         const contentType = connect.headers.get("Content-Type");
+        const text = await connect.text();
 
         // If it's JSON, parse it
         if (contentType && contentType.includes("application/json")) {
-            return await connect.json();
+            if(!text) {
+                throw new Error(`Empty JSON response from ${url} (${connect.status})`);
+            }
+            return JSON.parse(text);
         }
 
         // Otherwise, log what went wrong
-        const text = await connect.text();
         console.error("Expected JSON but got:", text);
         throw new Error(`Invalid response: ${text.substring(0, 100)}...`);
 
@@ -288,6 +335,11 @@ const connectPost = async (data, url) => {
         console.error('Error fetching post request data:', error.message);
         console.log('data:', data);
         console.log('url:', url);
+        return {
+            end: true,
+            errno: 500,
+            msg: error.message
+        }
     }
 }
 
@@ -348,4 +400,3 @@ function bufferToBase64url(buffer) {
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 }
-
