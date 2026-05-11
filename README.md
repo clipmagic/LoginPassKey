@@ -10,6 +10,7 @@ This module enables users to log in to ProcessWire with a WebAuthn passkey rathe
    * [Features](#features)
    * [How it works (Short version)](#how-it-works-short-version)
    * [How it works (Long version TLDR;)](#how-it-works-long-version-tldr)
+   * [Login entry points](#login-entry-points)
    * [Installation ](#installation)
    * [Configuration](#configuration)
       + [Activate module](#activate-module)
@@ -89,16 +90,29 @@ After a user enters their passkey (eg, fingerprint) to login, the following are 
 
 Should any of the above tests fail, the user is denied access and to continue the login process, must enter their password.
 
+<a id="login-entry-points"></a>
+## Login entry points
+LoginPassKey separates the browser flow from the endpoint that handles each step. The browser-side JavaScript starts at the configured API endpoint and moves through the same `start`, `finduser`, `register`, `verify` and `end` steps regardless of where the login button appears.
+
+Supported entry points:
+
+1. **ProcessWire admin login** - enabled with **Enable Admin Passkey login**. The module adds the passkey button to the default admin login form and uses the configured API endpoint.
+2. **Default `lpk-api` page/template** - installed by the module. The template file is copied from `site/modules/LoginPassKey/lpk-api.php` to `site/templates/lpk-api.php`. If you customise the installed template, keep the module copy in sync before distributing or reinstalling.
+3. **AppApi endpoint** - optional alternate endpoint. See `examples/LoginPassKeyAppApi.php`. It should expose the same step names and call the same LoginPassKey methods as the default `lpk-api` endpoint.
+4. **LoginRegisterPro** - optional frontend integration. It requires a `site/ready.php` hook to add the passkey button and supporting JavaScript to the LoginRegisterPro form. The hook still starts the same LoginPassKey JavaScript flow and uses the configured API endpoint.
+
+All endpoint implementations must preserve the same server-side security checks. In particular, the verification challenge is created by LoginPassKey, stored in the user's session, and consumed during the `verify` step.
+
 <a id="installation"></a>
 ## Installation
 During the installation process, the module creates:
-- The Api template. The default name is `lkp-api` that includes attributes such as:
+- The API template. The default name is `lpk-api` that includes attributes such as:
   - one page only, 
   - no children,
-  - urlSegments `start`, `register`, `verify` and `end`,
+  - URL segments `start`, `finduser`, `register`, `verify` and `end`,
   - content type of `application-json`, and
   - disables appending of `_main.php`.
-- A publicly accessible page which is assigned the `lkp-api` template and is `hidden`.
+- A publicly accessible page which is assigned the `lpk-api` template and is `hidden`.
 - It is then up to you to create a login page. See `examples/loginpasskey-page-tpl.php` for inspiration.
 - An admin page under `Access` to view a list of users who have passkeys and delete passkeys depending on user permissions.
 
@@ -128,7 +142,7 @@ The module configuration fields are:
 
 **Frontend page template** - see `loginpasskey-page-tpl.php` in the `examples` folder. The script MUST be present but the layout can be whatever you choose. The id attribute of the button MUST match the `getElementById` selector.
 
-**LoginPassKey with LoginRegisterPro** - Requires a hook in `site\ready.php` see `loginpasskey-for-loginregisterpro-hook` in the `examples` folder. The script MUST be present but the layout can be whatever you choose. The id attribute of the button MUST match the `getElementById` selector. The CSS and associated script to trigger the transitions, are in the second `Page::render` hook. You can remove this hook and add the styles and script to your own files.
+**LoginPassKey with LoginRegisterPro** - Requires a hook in `site/ready.php`; see `examples/loginpasskey-for-loginregisterpro-hook.php`. The hook adds a passkey button to the LoginRegisterPro login form, defines the configured API endpoint for the JavaScript, and can optionally auto-trigger passkey registration for an already logged-in frontend user. The button ID must match the JavaScript selector. The included CSS and transition script are only an example and may be replaced with your own frontend code.
 
 **LoginPassKey with AppApi** - See `LoginPassKeyAppApi` in the `examples` folder. Copy this file to your AppApi `api` directory, update your `Routes.php` (instructions in example) and change the LoginPassKey API ENDPOINT in this module configuration.
 

@@ -23,7 +23,7 @@
     <meta name="viewport"
           content="width=device-width, initial-scale=1">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>LoginRegister Example</title>
+    <title>LoginPassKey Example</title>
     <style>
         body {
             width: 100vw;
@@ -64,12 +64,12 @@
 </head>
 <body>
 <div class="container">
-    <form action="./">
+    <form action="./" method="post">
         <label for="login_name">
             <?=__("Enter your username or email address")?>
         </label>
-        <input id="login_name" type="text" class="ProcessLoginName webauthn" required>
-        <button id="lpk">Passkey</button>
+        <input id="login_name" name="login_name" type="text" class="ProcessLoginName webauthn" autocomplete="username webauthn" required>
+        <button id="lpk" type="button">Passkey</button>
     </form>
 
     <div id="end">
@@ -77,28 +77,27 @@
     </div>
 </div>
 
+<script src="<?=$config->urls($modules->get('LoginPassKey'))?>LoginPassKey.js"></script>
 <script>
     let apiUrl = "<?=$page->lpkGetApiUrl()?>";
-    let redirectUrl = "<?=$page->lpkGetRedirectUrl()?>"
-    if(!redirectUrl) redirectUrl = 'window.location.href'
 
     // hacky solution for iOS not always honouring DOMContentLoaded
     function runOnStart() {
         const btn = document.getElementById('lpk')
         let end = document.getElementById('end')
+        if(!btn || !end) return
 
         btn.addEventListener('click', (e) => {
             e.preventDefault()
-            lpk.action(`${apiUrl}start`).then (res => {
-
-                // check the result
-                console.log(res)
-                if(res && res.msg) {
-                    // window.location.href = redirectUrl
-                    end.textContent = res.msg
+            lpk.action(apiUrl + 'start').then (res => {
+                if(res && res.errno === 101 && res.goto) {
+                    window.location.href = res.goto
+                    return
                 }
 
-                if(res && res.error) {
+                if(res && res.msg) {
+                    end.textContent = res.msg
+                } else if(res && res.error) {
                     end.textContent = res.error
                 }
             })

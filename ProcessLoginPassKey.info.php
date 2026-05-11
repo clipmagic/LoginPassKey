@@ -15,7 +15,7 @@
 $info = [
     'title' => 'ProcessLoginPassKey',
     'summary' => 'Manage your LoginPassKeys',
-    'version' => '0.0.3Beta',
+    'version' => '0.0.4Beta',
     'author' => 'Clip Magic',
     'icon' => 'key',
     'requires' =>[ "ProcessWire>=3.0.246,", "LoginPassKey"],

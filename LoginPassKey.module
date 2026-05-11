@@ -97,9 +97,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         // Replying party host
         $field = $modules->get('InputfieldText');
         $field->name = 'rp';
-        $field->label = $this->_("Host name (Replying Party)");
+        $field->label = $this->_("Host name");
         $field->columnWidth	= 50;
-        $field->notes($this->_("Leave blank to default to config->host. Must match the URL defined in your .htaccess file, eg with/without 'www'"));
+        $field->notes($this->_("Leave blank to default to config->host")) ;
         $field->value = !empty($data['rp']) ? $sanitizer->text($data['rp']) : $this->wire('config')->httpHost;
         $fieldset->add($field);
         $fields->add($fieldset);
@@ -335,8 +335,10 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $return = $event->return;
         if(!$this->enabled) return;
         if($this->page->template->name !== 'admin') {
-            $js = "<script src='" . $this->config()->urls($this) . $this->className() . ".js'></script>";
-            $return = str_ireplace("</body>", $js . "</body>", $event->return);
+            if(\strpos($return, $this->className() . ".js") === false) {
+                $js = "<script src='" . $this->config()->urls($this) . $this->className() . ".js'></script>";
+                $return = str_ireplace("</body>", $js . "</body>", $event->return);
+            }
         }
         $event->return = $return;
     }
@@ -404,7 +406,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
             $js  = "<script>";
             $js .= "let apiUrl = '$apiUrl'\n";
-            $js .= "lpk.action(`${apiUrl}register`, $fwdJSON).then(res=> console.log(res))\n";
+            $js .= "lpk.action(apiUrl + 'register', $fwdJSON)\n";
             $js .= "</script>";
             $return = str_ireplace("</body>", $js . "</body>", $event->return);
 
@@ -426,6 +428,113 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $pathOrId = \strpos($this->redirect_url,'/') !== false ? $sanitizer->text($this->redirect_url) : $sanitizer->int($this->redirect_url);
 
         return $pages->get($pathOrId)->url;
+    }
+
+    public function handleApiStep($data, string $step): \stdClass
+    {
+        if (!$data instanceof \stdClass) {
+            $data = new \stdClass();
+        }
+
+        $session = $this->wire('session');
+        $modules = $this->wire('modules');
+        $pages = $this->wire('pages');
+        $user = $this->wire('user');
+
+        $lpkData = new \stdClass();
+        $lpkData->data = $data;
+
+        switch ($step) {
+            case 'finduser':
+                $username = $data->un ?? '';
+                $foundUser = $this->findUser($username);
+                $session->setFor('lpk', 'username', $username);
+
+                if (empty($foundUser->msg)) {
+                    $feUserObj = $this->getUserByField($foundUser->un);
+
+                    if ($feUserObj instanceof User) {
+                        $session->setFor('lpk', 'userid', $feUserObj->id);
+                        $nextAction = $foundUser->next ?? 'end';
+
+                        if ($nextAction === 'verify') {
+                            $lpkData->data->verifyArgs = $this->verifyUser($feUserObj);
+                            $lpkData->data->next = 'verify';
+                        } elseif ($nextAction === 'register' && $user->isLoggedIn() && $user->id === $feUserObj->id) {
+                            $lpkData->data->pk = $this->preRegisterUser($feUserObj);
+                            $lpkData->data->feUserid = $feUserObj->id;
+                            $lpkData->data->next = 'register';
+                        } elseif ($nextAction === 'register') {
+                            $lpkData->data->msg = $this->getErrorMessage(50);
+                            $lpkData->data->errno = 50;
+                            $lpkData->data->next = 'end';
+                        } else {
+                            $lpkData->data->next = 'end';
+                        }
+                    }
+                } else {
+                    $lpkData->data->msg = $foundUser->msg;
+                    $lpkData->data->next = 'end';
+                }
+                break;
+
+            case 'register':
+                $lpkData->data = new \stdClass();
+
+                if (!empty($data->aarcreate)) {
+                    $created = $this->registerUser($user, $data->aarcreate);
+
+                    if (!!$created) {
+                        $session->setFor('lpk', 'success', 'success');
+                        $session->removeFor('lpk', 'username');
+                        $lpkData = $created;
+                    }
+                } else {
+                    $lpkData->msg = $this->getErrorMessage(2);
+                    $lpkData->errno = 2;
+                }
+                break;
+
+            case 'verify':
+                $errno = $data->errno ?? 4;
+                if (($errno && $errno !== 101) || empty($data->aarverify)) {
+                    $lpkData->msg = $this->getErrorMessage($errno);
+                    $lpkData->errno = $errno;
+                    $lpkData->data->next = 'end';
+                } else {
+                    $verified = $this->verifyResponse($data->aarverify, $data->challenge ?? null, $data->signedData ?? null);
+
+                    $lpkData->data = $verified;
+                    if ($verified->errno === 101) {
+                        $lpkData->msg = $this->getErrorMessage(101);
+                        $username = $session->getFor('lpk', 'username');
+                        $feUser = $this->getUserByField($username);
+                        $session->setFor('lpk', 'success', 'success');
+                        $session->forceLogin($feUser);
+                        $lpkConfig = $modules->getConfig('LoginPassKey');
+
+                        if ($session->getFor('lpk', 'inadmin')) {
+                            $processLogin = $modules->get('ProcessLogin');
+                            $processLogin->execute();
+                        } elseif ($modules->isInstalled('LoginRegisterPro') && $lpkConfig['enabled'] === 1) {
+                            $processLogin = $modules->get('LoginRegisterPro');
+                            $processLogin->execute();
+                        } elseif (!empty($lpkConfig['redirect_url'])) {
+                            $lpkData->goto = $this->getRedirectUrl();
+                        } else {
+                            $lpkData->goto = $pages->get(1)->httpUrl;
+                        }
+                    }
+                }
+                break;
+
+            case 'end':
+            case 'start':
+            default:
+                break;
+        }
+
+        return $lpkData;
     }
 
     public function getDatabase()
@@ -538,7 +647,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
 
         // The user is legit and permitted to use WebAuthn
-        if($feUser->isGuest() ) {
+        if($user->isGuest() ) {
             $count = $this->_checklpkDB($feUser);
             // if count 0, they need to login with their password to register
             // otherwise, they have credentials in the DB which need to be verified
@@ -806,6 +915,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $output->publicKey = new \stdClass();
         $output->publicKey->timeout = 420000000; // microseconds = 7mins
         $output->publicKey->challenge = $this->_createChallenge();  // binary
+        $this->wire('session')->setFor('lpk', 'verifyChallenge', $this->base64url_encode($output->publicKey->challenge));
         $output->publicKey->userVerification = $this->userVerification;
         $output->publicKey->rpId = $lpkArgs->rp;
         $output->publicKey->authenticatorSelection = new \stdClass();
@@ -869,8 +979,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             }
 
             // challenges dont match
-            $clientChallenge = \rtrim($challenge, "=");
-            if($clientChallenge !== $clientData->challenge) {
+            $expectedChallenge = $session->getFor('lpk', 'verifyChallenge');
+            $session->removeFor('lpk', 'verifyChallenge');
+            if(empty($expectedChallenge) || $expectedChallenge !== $clientData->challenge) {
                 $output->msg = $this->_('Challenge did not match');
                 return $output;
             }
@@ -1002,6 +1113,11 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $data .= str_repeat('=', 4 - $padding);
         }
         return base64_decode($data);
+    }
+
+    public function base64url_encode($data)
+    {
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 
     function publicKeyToPem($b64url) {

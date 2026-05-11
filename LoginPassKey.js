@@ -199,7 +199,6 @@ let lpk = {
                         fn: "verify",
                         next: "end",
                         aarverify: await cred.toJSON(),
-                        challenge:  credToJSON(va.publicKey.challenge),
                         signedData: bufferToBase64url(signedData),
                         errno: 101
                     }
@@ -258,7 +257,7 @@ let lpk = {
         data.fn = 'register'
         data.end = 'end'
 
-        await lpk.action("`${apiUrl}register`", data).then (fwd => {
+        return await lpk.action(lpkEndpointUrl(`${apiUrl.replace(/\/+$/, '')}/register`), data).then (fwd => {
             let result = {}
             result.end = true
 

@@ -12,7 +12,7 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         $lpk = $modules->get('LoginPassKey');
 
         // ensure LPK is enabled for the frontend
-        if(!$lpk->enabled === 1) return;
+        if($lpk->enabled !== 1) return;
 
         $apiUrl = $lpk->api_url;
 
@@ -51,7 +51,7 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         
                 btn.addEventListener('click', (e) => {
                     e.preventDefault()
-                    lpk.action(`${apiUrl}start`).then (res => {
+                    lpk.action(apiUrl + 'start').then (res => {
                         if(res && res.errno && res.errno === 101 && res.goto) {
                             window.location.href = res.goto
                         }
@@ -102,54 +102,11 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
 
             $js  = "<script>";
             $js .= "let apiUrl = '$apiUrl'\n";
-//            $js .= "lpk.registerOnly('$apiUrl', $fwdJSON)\n";
             $js .= "lpk.action('$apiUrl' + 'register', $fwdJSON)\n";
             $js .= "</script>";
             $return = str_ireplace("</body>", $js . "</body>", $event->return);
 
-            // regardless of outcome, only run once per session
-            $session->setFor('lpk', 'success', 'success');
             $event->return = $return;
         }
-    });
-
-    // Add some transitions (could have put it in above hook but cleaner
-    // to keep them separate. Better still, move the styles & script to
-    // your own files
-    $wire->addHookAfter('Page::render', function ($event) {
-        $css = <<<EOT
-                <style>                    
-                    .LoginRegisterPro .LoginForm .Inputfields {
-                        position: relative;
-                        display: grid;
-                        grid-template-rows: auto auto 0fr 0fr 0fr;
-                        transition: grid-template-rows 1s;
-                    }                    
-                    .LoginRegisterPro .LoginForm .Inputfields > * {
-                        overflow: hidden;
-                        padding: 0 !important;
-                    }                    
-                    .LoginRegisterPro .LoginForm .Inputfields.pword {
-                        grid-template-rows: auto 0fr auto auto auto;
-                    }                    
-                </style>
-EOT;
-        $js = <<<EOT
-<script>
-     let btn = document.getElementById('lpk')
-     if(btn) {
-         btn.addEventListener('click', (e) => {
-             let nameFld = document.querySelector('.LoginRegisterPro .LoginForm #login_name')
-             if(nameFld.value === '') {
-               document.getElementById('Inputfield_login_submit').click();
-               return false;
-             }
-             document.querySelector('.LoginRegisterPro .LoginForm .Inputfields').classList.toggle('pword');
-         })
-     }
-</script>
-EOT;
-        $return = str_ireplace("</head>", $css, $event->return);
-        $event->return = str_ireplace("</body>", $js, $return);
     });
 }

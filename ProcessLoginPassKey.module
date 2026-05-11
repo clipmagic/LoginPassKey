@@ -152,18 +152,20 @@ class ProcessLoginPassKey extends ProcessModule
 
         // process deleted passkeys
         $form->processInput($input->post); // for CSRF only
-        $ids = \implode(",", $input->post('deletes'));
+        $ids = \array_values(\array_filter(\array_map('intval', (array) $input->post('deletes'))));
+        if (\count($ids) === 0) return 0;
 
-        $sql = "DELETE FROM " . $lpk->getTableName() . " WHERE id IN (" . $ids . ")";
+        $placeholders = \implode(',', \array_fill(0, \count($ids), '?'));
+        $sql = "DELETE FROM " . $lpk->getTableName() . " WHERE id IN ($placeholders)";
         $query = $db->prepare($sql);
         $query->closeCursor();
 
         try {
-            $query->execute();
+            $query->execute($ids);
         } catch (WireException $e) {
             throw new WireException("An error occurred while trying to delete: " . $e->getMessage());
         }
-        return \count($input->post('deletes'));
+        return \count($ids);
     }
 
     public function ___getPassKeys($table, $checkbox)
