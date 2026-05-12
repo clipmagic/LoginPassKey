@@ -2,6 +2,13 @@
 
 All notable changes to LoginPassKey will be documented in this file.
 
+## 0.2.0
+
+- Replaced automatic post-login passkey registration with an explicit registration banner for eligible users without a passkey.
+- Added helper methods/hooks for checking whether a user already has a passkey and whether the current user can self-manage passkeys.
+- Added admin profile and LoginRegisterPro profile self-management for users with `profile-edit`, limited to adding and deleting their own passkeys.
+- Fixed chained JavaScript API steps so they derive the endpoint from the current action URL instead of requiring a global `apiUrl`.
+
 ## 0.1.0
 
 - Added optional passkey-only login using WebAuthn discoverable credentials.

@@ -243,7 +243,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
                     $user = $this->wire('user');
                     if(empty($session->getFor('lpk', 'success')) && $user->isLoggedIn()) {
-                        // show passkey registration popup if not already logged in with passkey
+                        // show passkey registration banner if not already logged in with passkey
                         $this->wire()->addHookAfter('Page::render', $this, 'registerAdmin');
                     }
                 }
@@ -255,6 +255,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $this->addHook('Page::lpkGetArgs', $this, 'lpkGetArgs');
         $this->addHook('Page::lpkPreRegisterUser', $this, 'lpkPreRegisterUser');
         $this->addHook('Page::lpkRegisterUser', $this, 'lpkRegisterUser');
+        $this->addHook('Page::lpkUserHasPasskey', $this, 'lpkUserHasPasskey');
+        $this->addHook('Page::lpkCanSelfManagePasskeys', $this, 'lpkCanSelfManagePasskeys');
         $this->addHook('Page::lpkGetApiUrl', $this, 'lpkGetApiUrl');
         $this->addHook('Page::lpkGetRedirectUrl', $this, 'lpkGetRedirectUrl');
         $this->addHook('Page::lpkGetApiHttpUrl', $this, 'lpkGetApiHttpUrl');
@@ -263,6 +265,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $this->addHook('Page::lpkGetUserByField', $this, 'lpkGetUserByField');
         $this->addHook('Page::lpkVerifyResponse', $this, 'lpkVerifyResponse');
         $this->addHook('Page::lpkGetErrorMessage', $this, 'lpkGetErrorMessage');
+        $this->addHookBefore('ProcessProfile::execute', $this, 'processProfilePasskeyActions');
+        $this->addHookAfter('ProcessProfile::execute', $this, 'addProfilePasskeyManagement');
     }
 
     public function ___ready() : void
@@ -327,6 +331,18 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $event->return = $this->registerUser($user, $dn);
     }
 
+    public function lpkUserHasPasskey(HookEvent $event)
+    {
+        $user = $event->arguments(0);
+        $event->return = $user instanceof User && $this->userHasPasskey($user);
+    }
+
+    public function lpkCanSelfManagePasskeys(HookEvent $event)
+    {
+        $user = $event->arguments(0);
+        $event->return = $this->canSelfManagePasskeys($user instanceof User ? $user : null);
+    }
+
     public function lpkVerify(HookEvent $event)
     {
         $user = $event->arguments(0);
@@ -347,9 +363,13 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $return = $event->return;
         if(!$this->enabled) return;
         if($this->page->template->name !== 'admin') {
+            if(\strpos($return, $this->className() . ".css") === false) {
+                $css = "<link rel='stylesheet' href='" . $this->config()->urls($this) . $this->className() . ".css'>";
+                $return = str_ireplace("</head>", $css . "</head>", $return);
+            }
             if(\strpos($return, $this->className() . ".js") === false) {
                 $js = "<script src='" . $this->config()->urls($this) . $this->className() . ".js'></script>";
-                $return = str_ireplace("</body>", $js . "</body>", $event->return);
+                $return = str_ireplace("</body>", $js . "</body>", $return);
             }
         }
         $event->return = $return;
@@ -390,10 +410,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public function registerAdmin(HookEvent $event) {
 
-        // Register a logged in front end user
-        $session = $this->wire('session');
-
-
+        // Offer passkey registration to an eligible logged-in admin user.
         $user = $this->wire('user');
 
         $lpk = $this->wire('modules')->get('LoginPassKey');
@@ -401,9 +418,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
         $allowed = $this->userAllowed($user);
 
-        if ($allowed !== false) {
+        if ($allowed !== false && !$this->userHasPasskey($user)) {
 
-            // auto trigger the registration process
             $fwd = new \stdClass();
             $fwd->fn = 'finduser';
             $fwd->un = $user->name;
@@ -415,17 +431,215 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
             $fwd->data = $data;
             $fwdJSON = \json_encode($fwd);
+            $bannerId = 'LoginPassKeyRegisterBanner';
+            $endId = 'LoginPassKeyRegisterResult';
+            $bannerText = $this->_('Add a passkey to sign in faster next time.');
+            $addText = $this->_('Add passkey');
+            $dismissText = $this->_('Not now');
+            $successText = $this->_('Passkey added.');
 
-            $js  = "<script>";
-            $js .= "let apiUrl = '$apiUrl'\n";
-            $js .= "lpk.action(apiUrl + 'register', $fwdJSON)\n";
-            $js .= "</script>";
-            $return = str_ireplace("</body>", $js . "</body>", $event->return);
+            $html = <<<HTML
+<div id="$bannerId" class="LoginPassKeyBanner NoticeWarning ui-state-highlight">
+    <div>
+        <strong>$bannerText</strong>
+        <div id="$endId" class="LoginPassKeyBannerResult"></div>
+    </div>
+    <div class="LoginPassKeyBannerActions">
+        <button type="button" id="LoginPassKeyRegisterButton" class="ui-button ui-widget ui-corner-all">$addText</button>
+        <button type="button" id="LoginPassKeyDismissButton" class="ui-button ui-widget ui-corner-all">$dismissText</button>
+    </div>
+</div>
+<script>
+(() => {
+    const banner = document.getElementById('$bannerId');
+    const result = document.getElementById('$endId');
+    const add = document.getElementById('LoginPassKeyRegisterButton');
+    const dismiss = document.getElementById('LoginPassKeyDismissButton');
+    const apiUrl = '$apiUrl';
+    const fwd = $fwdJSON;
 
-            // regardless of outcome, only run once per session
-            $session->setFor('lpk', 'success', 'success');
+    if(dismiss && banner) {
+        dismiss.addEventListener('click', () => banner.remove());
+    }
+    if(add && banner) {
+        add.addEventListener('click', (event) => {
+            event.preventDefault();
+            lpk.action(apiUrl + 'register', fwd).then((res) => {
+                if(res && res.msg && result) result.textContent = res.msg;
+                if(res && (res.errno === 102 || res.errno === 101)) {
+                    if(result) result.textContent = res.msg || '$successText';
+                    add.disabled = true;
+                    banner.classList.add('is-success');
+                    window.setTimeout(() => banner.classList.add('is-fading'), 1400);
+                    window.setTimeout(() => banner.remove(), 1800);
+                }
+            });
+        });
+    }
+})();
+</script>
+HTML;
+            $return = $this->injectPasskeyBanner($event->return, $html);
+
             $event->return = $return;
         }
+    }
+
+    protected function injectPasskeyBanner(string $markup, string $banner): string
+    {
+        $targets = [
+            '<div id="content"',
+            '<main',
+            '<body',
+        ];
+
+        foreach ($targets as $target) {
+            $pos = stripos($markup, $target);
+            if ($pos === false) continue;
+
+            $close = strpos($markup, '>', $pos);
+            if ($close === false) continue;
+
+            return substr($markup, 0, $close + 1) . $banner . substr($markup, $close + 1);
+        }
+
+        return str_ireplace("</body>", $banner . "</body>", $markup);
+    }
+
+    public function processProfilePasskeyActions(HookEvent $event): void
+    {
+        $input = $this->wire('input');
+        if (!$input->post('lpk_profile_delete')) return;
+
+        $user = $this->wire('user');
+        $session = $this->wire('session');
+
+        if (!$this->canSelfManagePasskeys($user)) {
+            throw new WirePermissionException($this->_('You do not have permission to manage passkeys.'));
+        }
+
+        if (!$session->CSRF->hasValidToken()) {
+            throw new WireException($this->_('Invalid form submission.'));
+        }
+
+        $ids = \array_values(\array_filter(\array_map('intval', (array) $input->post('lpk_profile_deletes'))));
+        if (\count($ids) > 0) {
+            $count = $this->deleteUserPasskeys($user, $ids);
+            if ($count > 0) {
+                $this->message(sprintf(_n('%d PassKey deleted from database.', '%d PassKeys deleted from database.', $count), $count));
+            }
+        }
+
+        $session->redirect('./');
+    }
+
+    public function addProfilePasskeyManagement(HookEvent $event): void
+    {
+        $markup = $event->return;
+        if (!\is_string($markup) || $markup === '') return;
+
+        $user = $this->wire('user');
+        if (!$this->canSelfManagePasskeys($user)) return;
+
+        $profileMarkup = $this->renderProfilePasskeyManagement($user);
+        if ($profileMarkup === '') return;
+
+        if (\strpos($markup, $this->className() . ".js") === false) {
+            $profileMarkup = "<script src='" . $this->config()->urls($this) . $this->className() . ".js'></script>" . $profileMarkup;
+        }
+        $event->return = str_ireplace('</form>', $profileMarkup . '</form>', $markup);
+    }
+
+    protected function renderProfilePasskeyManagement(User $user, string $deleteSubmitName = 'lpk_profile_delete', string $deleteSubmitValue = '1'): string
+    {
+        $sanitizer = $this->wire('sanitizer');
+        $rows = $this->getUserPasskeyRows($user);
+
+        $out = "<fieldset class='Inputfield LoginPassKeyProfilePasskeys'>";
+        $out .= "<legend class='InputfieldHeader'>" . $this->_('Passkeys') . "</legend>";
+        $out .= "<div class='InputfieldContent'>";
+        $out .= "<p>" . $this->_('Deleting passkeys from your profile removes them from this site but not from your device or passkey manager.') . "</p>";
+
+        if (\count($rows) === 0) {
+            $out .= "<p>" . $this->_('You do not have any passkeys registered for this site.') . "</p>";
+        } else {
+            $out .= "<table class='AdminDataTable AdminDataList LoginPassKeyProfileTable'>";
+            $out .= "<thead><tr>";
+            $out .= "<th>" . $this->_('Id') . "</th>";
+            $out .= "<th>" . $this->_('Created') . "</th>";
+            $out .= "<th>" . wireIconMarkup('trash', 'lg') . "</th>";
+            $out .= "</tr></thead><tbody>";
+
+            foreach ($rows as $row) {
+                $id = (int) $row['id'];
+                $created = $sanitizer->entities((string) $row['created']);
+                $out .= "<tr>";
+                $out .= "<td>$id</td>";
+                $out .= "<td>$created</td>";
+                $out .= "<td><label><input type='checkbox' name='lpk_profile_deletes[]' value='$id'> " . $this->_('Delete') . "</label></td>";
+                $out .= "</tr>";
+            }
+
+            $out .= "</tbody></table>";
+            $deleteSubmitName = $sanitizer->fieldName($deleteSubmitName);
+            $deleteSubmitValue = $sanitizer->entities($deleteSubmitValue);
+            $out .= "<button type='submit' name='$deleteSubmitName' value='$deleteSubmitValue' class='ui-button ui-widget ui-corner-all'>";
+            $out .= wireIconMarkup('trash') . " " . $this->_('Delete checked passkeys');
+            $out .= "</button>";
+        }
+
+        $apiUrl = $this->api_url;
+        $fwd = new \stdClass();
+        $fwd->fn = 'finduser';
+        $fwd->un = $user->name;
+        $fwd->next = 'register';
+
+        $data = new \stdClass();
+        $data->pk = $this->preRegisterUser($user);
+        $data->next = 'register';
+        $fwd->data = $data;
+
+        $fwdJSON = \json_encode($fwd);
+        $addText = $this->_('Add passkey');
+        $successText = $this->_('Passkey added. Reloading profile.');
+
+        $out .= "<p class='LoginPassKeyProfileActions'>";
+        $out .= "<button type='button' id='LoginPassKeyProfileAdd' class='ui-button ui-widget ui-corner-all'>";
+        $out .= wireIconMarkup('key') . " " . $addText;
+        $out .= "</button>";
+        $out .= " <span id='LoginPassKeyProfileResult' class='LoginPassKeyBannerResult'></span>";
+        $out .= "</p>";
+        $out .= <<<HTML
+<script>
+(() => {
+    const add = document.getElementById('LoginPassKeyProfileAdd');
+    const result = document.getElementById('LoginPassKeyProfileResult');
+    const fwd = $fwdJSON;
+
+    if(!add) return;
+    add.addEventListener('click', (event) => {
+        event.preventDefault();
+        lpk.action('$apiUrl' + 'register', fwd).then((res) => {
+            if(res && res.msg && result) result.textContent = res.msg;
+            if(res && (res.errno === 102 || res.errno === 101)) {
+                if(result) result.textContent = res.msg || '$successText';
+                add.disabled = true;
+                window.setTimeout(() => window.location.reload(), 1200);
+            }
+        });
+    });
+})();
+</script>
+HTML;
+
+        $out .= "</div></fieldset>";
+        return $out;
+    }
+
+    public function renderSelfManagePasskeys(User $user, string $deleteSubmitName = 'lpk_profile_delete', string $deleteSubmitValue = '1'): string
+    {
+        if (!$this->canSelfManagePasskeys($user)) return '';
+        return $this->renderProfilePasskeyManagement($user, $deleteSubmitName, $deleteSubmitValue);
     }
 
     public function getApiHttpUrl()
@@ -745,18 +959,66 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         // OK they're a valid user
         // Now let's see if they have existing credentials
         try {
-            $count = false;
-            while (!$count) {
-                $db = wire('database');
-                $sql = "SELECT COUNT(user_id) from " . $this->getTableName() . " where user_id=" . $user->id;
-                $query = $db->prepare($sql);
-                $query->closeCursor();
-                $query->execute();
-                $result = $query->fetchAll(\PDO::FETCH_ASSOC);
-                return (int) $result[0]["COUNT(user_id)"];
-            }
+            $db = wire('database');
+            $sql = "SELECT COUNT(user_id) FROM " . $this->getTableName() . " WHERE user_id=:user_id";
+            $query = $db->prepare($sql);
+            $query->bindValue(':user_id', (int) $user->id, \PDO::PARAM_INT);
+            $query->closeCursor();
+            $query->execute();
+            return (int) $query->fetchColumn();
         } catch (WireException $e) {
-            return "Database Error: " . $e->getMessage();
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function userHasPasskey(User $user): bool
+    {
+        return $this->_checklpkDB($user) > 0;
+    }
+
+    public function canSelfManagePasskeys(?User $user = null): bool
+    {
+        if ((int) $this->enabled !== 1 && (int) $this->enabledAdmin !== 1) return false;
+        $user = $user ?: $this->wire('user');
+        if (!$user instanceof User || $user->isGuest()) return false;
+        return $user->hasPermission('profile-edit');
+    }
+
+    public function getUserPasskeyRows(User $user): array
+    {
+        try {
+            $db = $this->wire('database');
+            $sql = "SELECT `id`, `created` FROM " . $this->getTableName() . " WHERE user_id=:user_id ORDER BY created DESC, id DESC";
+            $query = $db->prepare($sql);
+            $query->bindValue(':user_id', (int) $user->id, \PDO::PARAM_INT);
+            $query->closeCursor();
+            $query->execute();
+            return $query->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (WireException $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function deleteUserPasskeys(User $user, array $ids): int
+    {
+        $ids = \array_values(\array_filter(\array_map('intval', $ids)));
+        if (\count($ids) === 0) return 0;
+
+        $placeholders = \implode(',', \array_fill(0, \count($ids), '?'));
+        $sql = "DELETE FROM " . $this->getTableName() . " WHERE user_id=? AND id IN ($placeholders)";
+        $params = \array_merge([(int) $user->id], $ids);
+
+        try {
+            $db = $this->wire('database');
+            $query = $db->prepare($sql);
+            $query->closeCursor();
+            $query->execute($params);
+            return $query->rowCount();
+        } catch (WireException $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return 0;
         }
     }
 

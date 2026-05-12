@@ -19,6 +19,13 @@ const lpkStepUrlFor = (baseUrl, step) => {
     return lpkEndpointUrl(`${baseUrl.replace(/\/+$/, '')}/${step}`)
 }
 
+const lpkBaseUrlFromStepUrl = (url) => {
+    const path = url.split('?')[0].replace(/\/+$/, '')
+    const parts = path.split('/')
+    parts.pop()
+    return `${parts.join('/').replace(/\/+$/, '')}/`
+}
+
 const lpkUrlSegment = (url) => {
     const path = url.split('?')[0].replace(/\/+$/, '')
     return path.split('/').pop()
@@ -40,6 +47,7 @@ let lpk = {
         // initated with 'start' in the page template js
         url = lpkEndpointUrl(url)
         let urlSegment = lpkUrlSegment(url)
+        const stepBaseUrl = lpkBaseUrlFromStepUrl(url)
 
 
         // check browser support
@@ -78,7 +86,7 @@ let lpk = {
                     .then(
                     (res) => {
                         if(res && res.end) return res
-                        return lpk.action(lpkStepUrl(startData.next),res)
+                        return lpk.action(lpkStepUrlFor(stepBaseUrl, startData.next),res)
                     } )
                 break;
 
@@ -108,8 +116,8 @@ let lpk = {
                         (res) => {
                             if(res && res.end) return res
                             const next = res && res.data ? res.data.next : null
-                            if(!next || next === 'end') return lpk.action(lpkStepUrl('end'), res)
-                            return lpk.action(lpkStepUrl(next),res)
+                            if(!next || next === 'end') return lpk.action(lpkStepUrlFor(stepBaseUrl, 'end'), res)
+                            return lpk.action(lpkStepUrlFor(stepBaseUrl, next),res)
                         } )
                break;
 
@@ -168,7 +176,7 @@ let lpk = {
                     .then(
                         (res) => {
                             if(res && res.end) return res
-                            return lpk.action(lpkStepUrl(registerData.next),res)
+                            return lpk.action(lpkStepUrlFor(stepBaseUrl, registerData.next),res)
                         }
                     )
                 break;
@@ -231,7 +239,7 @@ let lpk = {
                         .then(
                             (res) => {
                                if(res && res.end) return res
-                                return lpk.action(lpkStepUrl(verifyData.next), res)
+                                return lpk.action(lpkStepUrlFor(stepBaseUrl, verifyData.next), res)
                             })
                 break;
 

@@ -97,7 +97,58 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         $event->return = $form;
     });
 
-    // Register a logged in front end user
+    // Add self-management to the LoginRegisterPro profile form.
+    $wire->addHookAfter('LoginRegisterProProfile::build', function ($event) {
+        $modules = wire('modules');
+        $user = wire('user');
+        $lpk = $modules->get('LoginPassKey');
+
+        if(!$lpk->canSelfManagePasskeys($user)) return;
+
+        $form = $event->return;
+        $markup = $modules->get('InputfieldMarkup');
+        $markup->attr('id+name', 'lpk_profile_passkeys');
+        $markup->value = $lpk->renderSelfManagePasskeys($user, 'profile_submit', 'lpk_profile_delete');
+
+        $submit = $form->get('profile_submit');
+        if($submit) {
+            $form->insertBefore($markup, $submit);
+        } else {
+            $form->add($markup);
+        }
+
+        $event->return = $form;
+    });
+
+    // Process LoginRegisterPro profile passkey deletions before the profile save.
+    $wire->addHookBefore('LoginRegisterProProfile::process', function ($event) {
+        $input = wire('input');
+        if($input->post('profile_submit') !== 'lpk_profile_delete') return;
+
+        $session = wire('session');
+        $user = wire('user');
+        $lpk = wire('modules')->get('LoginPassKey');
+
+        if(!$lpk->canSelfManagePasskeys($user)) {
+            throw new WirePermissionException($lpk->_('You do not have permission to manage passkeys.'));
+        }
+
+        if(!$session->CSRF->hasValidToken()) {
+            throw new WireException($lpk->_('Invalid form submission.'));
+        }
+
+        $ids = \array_values(\array_filter(\array_map('intval', (array) $input->post('lpk_profile_deletes'))));
+        if(\count($ids) > 0) {
+            $count = $lpk->deleteUserPasskeys($user, $ids);
+            if($count > 0) {
+                $lpk->message(sprintf(_n('%d PassKey deleted from database.', '%d PassKeys deleted from database.', $count), $count));
+            }
+        }
+
+        $session->redirect('./');
+    });
+
+    // Offer passkey registration to an eligible logged-in front end user.
     $wire->addHookAfter('Page::render', function ($event) {
         $session = $this->wire('session');
         if(!empty($session->getFor('lpk', 'success'))) return;
@@ -107,8 +158,7 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         $lpk = $this->wire('modules')->get('LoginPassKey');
         $apiUrl = $lpk->api_url;
 
-        if ($user->isLoggedIn() && $lpk->enabled === 1 && $page->template->name !== 'admin') {
-            // auto trigger the registration process
+        if ($user->isLoggedIn() && $lpk->enabled === 1 && $page->template->name !== 'admin' && !$lpk->userHasPasskey($user)) {
             $fwd = new \stdClass();
             $fwd->fn = 'finduser';
             $fwd->un = $user->name;
@@ -119,12 +169,63 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
 
             $fwd->data = $data;
             $fwdJSON = \json_encode($fwd);
+            $bannerText = $lpk->_('Add a passkey to sign in faster next time.');
+            $addText = $lpk->_('Add passkey');
+            $dismissText = $lpk->_('Not now');
+            $successText = $lpk->_('Passkey added.');
 
-            $js  = "<script>";
-            $js .= "let apiUrl = '$apiUrl'\n";
-            $js .= "lpk.action('$apiUrl' + 'register', $fwdJSON)\n";
-            $js .= "</script>";
-            $return = str_ireplace("</body>", $js . "</body>", $event->return);
+            $html = <<<HTML
+<div id="LoginPassKeyRegisterBanner" class="LoginPassKeyBanner">
+    <div>
+        <strong>$bannerText</strong>
+        <div id="LoginPassKeyRegisterResult" class="LoginPassKeyBannerResult"></div>
+    </div>
+    <div class="LoginPassKeyBannerActions">
+        <button type="button" id="LoginPassKeyRegisterButton">$addText</button>
+        <button type="button" id="LoginPassKeyDismissButton">$dismissText</button>
+    </div>
+</div>
+<script>
+(() => {
+    const banner = document.getElementById('LoginPassKeyRegisterBanner');
+    const result = document.getElementById('LoginPassKeyRegisterResult');
+    const add = document.getElementById('LoginPassKeyRegisterButton');
+    const dismiss = document.getElementById('LoginPassKeyDismissButton');
+    const fwd = $fwdJSON;
+
+    if(dismiss && banner) {
+        dismiss.addEventListener('click', () => banner.remove());
+    }
+    if(add && banner) {
+        add.addEventListener('click', (event) => {
+            event.preventDefault();
+            lpk.action('$apiUrl' + 'register', fwd).then((res) => {
+                if(res && res.msg && result) result.textContent = res.msg;
+                if(res && (res.errno === 102 || res.errno === 101)) {
+                    if(result) result.textContent = res.msg || '$successText';
+                    add.disabled = true;
+                    banner.classList.add('is-success');
+                    window.setTimeout(() => banner.classList.add('is-fading'), 1400);
+                    window.setTimeout(() => banner.remove(), 1800);
+                }
+            });
+        });
+    }
+})();
+</script>
+HTML;
+            $return = $event->return;
+            foreach (['<main', '<body'] as $target) {
+                $pos = stripos($return, $target);
+                if ($pos === false) continue;
+                $close = strpos($return, '>', $pos);
+                if ($close === false) continue;
+                $return = substr($return, 0, $close + 1) . $html . substr($return, $close + 1);
+                break;
+            }
+            if (strpos($return, 'LoginPassKeyRegisterBanner') === false) {
+                $return = str_ireplace("</body>", $html . "</body>", $return);
+            }
 
             $event->return = $return;
         }

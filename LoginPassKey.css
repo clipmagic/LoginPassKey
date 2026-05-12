@@ -41,3 +41,55 @@
         }
     }
 }
+
+.LoginPassKeyBanner {
+    align-items: center;
+    background: #fff3cd;
+    border: 1px solid #d6a100;
+    color: #3d3320;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin: 0 0 1rem 0;
+    padding: 0.9rem 1rem;
+    position: relative;
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    z-index: 50;
+}
+
+.LoginPassKeyBanner.is-success {
+    background: #d1e7dd;
+    border-color: #75b798;
+    color: #0f5132;
+}
+
+.LoginPassKeyBanner.is-fading {
+    opacity: 0;
+    transform: translateY(-6px);
+}
+
+.LoginPassKeyBannerActions {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+}
+
+.LoginPassKeyBannerResult {
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+}
+
+.LoginPassKeyProfileTable th {
+    text-align: left;
+}
+
+@media (max-width: 640px) {
+    .LoginPassKeyBanner {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .LoginPassKeyBannerActions {
+        flex-wrap: wrap;
+    }
+}

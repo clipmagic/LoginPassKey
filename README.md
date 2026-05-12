@@ -154,7 +154,7 @@ The module configuration fields are:
 
 **Frontend page template** - see `loginpasskey-page-tpl.php` in the `examples` folder. The LoginPassKey JavaScript must be present but the layout can be whatever you choose. Button IDs must match the JavaScript selectors.
 
-**LoginPassKey with LoginRegisterPro** - Requires a hook in `site/ready.php`; see `examples/loginpasskey-for-loginregisterpro-hook.php`. The hook adds username/email + passkey and passkey-only buttons to the LoginRegisterPro login form, defines the configured API endpoint for the JavaScript, and can optionally auto-trigger passkey registration for an already logged-in frontend user. Button IDs must match the JavaScript selectors. The included markup and script are only an example and may be replaced with your own frontend code.
+**LoginPassKey with LoginRegisterPro** - Requires a hook in `site/ready.php`; see `examples/loginpasskey-for-loginregisterpro-hook.php`. The hook adds username/email + passkey and passkey-only buttons to the LoginRegisterPro login form, defines the configured API endpoint for the JavaScript, and can optionally show a passkey registration banner for an eligible logged-in frontend user who has no passkey yet. Button IDs must match the JavaScript selectors. The included markup and script are only an example and may be replaced with your own frontend code.
 
 **LoginPassKey with AppApi** - See `LoginPassKeyAppApi` in the `examples` folder. Copy this file to your AppApi `api` directory, update your `Routes.php` (instructions in example) and change the LoginPassKey API ENDPOINT in this module configuration.
 
@@ -165,6 +165,12 @@ The module configuration fields are:
 When logged into the admin area, a user who is a superuser or has the `passkeys` permission, the page `PassKeys` appears as a child page of `Access`.
 
 Users with this permission can view and/or delete existing passkeys.  The list only shows `id`, `user id`, `username` and date `created`. It does not display any passkey authentication data.
+
+After password login, eligible admin users without a passkey are shown an explicit registration banner instead of automatic passkey registration.
+
+Users with ProcessWire's `profile-edit` permission can manage their own passkeys from the admin profile edit screen. The LoginRegisterPro example hook also adds the same self-management UI to the LoginRegisterPro profile form. This self-management section only shows the current user's passkeys, lets them add another passkey, and lets them delete their own passkeys. Superuser/admin recovery remains available through `ProcessLoginPassKey`.
+
+For custom frontend self-management, templates can check `$page->lpkCanSelfManagePasskeys($user)` before showing passkey management UI.
 
 <a id="important"></a>
 ## IMPORTANT
