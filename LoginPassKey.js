@@ -12,7 +12,11 @@ const lpkEndpointUrl = (url) => {
 }
 
 const lpkStepUrl = (step) => {
-    return lpkEndpointUrl(`${apiUrl.replace(/\/+$/, '')}/${step}`)
+    return lpkStepUrlFor(apiUrl, step)
+}
+
+const lpkStepUrlFor = (baseUrl, step) => {
+    return lpkEndpointUrl(`${baseUrl.replace(/\/+$/, '')}/${step}`)
 }
 
 const lpkUrlSegment = (url) => {
@@ -55,6 +59,13 @@ let lpk = {
         switch (urlSegment) {
             case 'start':
                 const userFld = document.getElementById('login_name')
+                if(!userFld || !userFld.value.trim()) {
+                    return {
+                        end: true,
+                        errno: 60,
+                        msg: 'No username provided'
+                    }
+                }
                 // OK, start the process
                 const startData = {
                     un: userFld.value.trim(),
@@ -226,21 +237,32 @@ let lpk = {
 
             case 'end':
                 if(fwd) {
+                    const outer = fwd
                     if(fwd.data) {
                         fwd = fwd.data
                     }
                     let result = {}
                     result.end = true
-                    if(fwd && fwd.msg)
+                    if(outer && outer.msg)
+                        result.msg = outer.msg
+                    else if(fwd && fwd.msg)
                         result.msg = fwd.msg
-                    if(fwd && fwd.error)
+                    if(outer && outer.error)
+                        result.error = outer.error
+                    else if(fwd && fwd.error)
                         result.error = fwd.error
-                    if(fwd && fwd.un)
+                    if(outer && outer.un)
+                        result.un = outer.un
+                    else if(fwd && fwd.un)
                         result.un = fwd.un
-                    if(fwd && fwd.errno) {
-                        result.errno = fwd.errno
-                        if(fwd.errno === 101 && fwd.goto) {
-                            window.location.href = fwd.goto
+                    if(outer && outer.goto)
+                        result.goto = outer.goto
+                    else if(fwd && fwd.goto)
+                        result.goto = fwd.goto
+                    if((outer && outer.errno) || (fwd && fwd.errno)) {
+                        result.errno = outer.errno || fwd.errno
+                        if(result.errno === 101 && result.goto) {
+                            window.location.href = result.goto
                         }
                     }
                     return result
@@ -275,6 +297,73 @@ let lpk = {
             }
             console.log(result)
             return result
+        })
+    },
+
+    // used for discoverable credential login without username/email
+    discover: async (apiUrl) => {
+        const encoder = new TextEncoder()
+        let cred
+        const startUrl = lpkStepUrlFor(apiUrl, 'discover-start')
+
+        if (!window.fetch || !navigator.credentials || !navigator.credentials.get) {
+            return {
+                end: true,
+                errno: 1,
+                msg: 'Sorry, your browser does not support this feature'
+            }
+        }
+
+        return await connectPost({
+            fn: 'discover-start',
+            next: 'discover-verify'
+        }, startUrl).then(async (res) => {
+            if (!res || !res.data || !res.data.verifyArgs) {
+                return {
+                    end: true,
+                    errno: 500,
+                    msg: 'Passkey login failed before discover returned usable data'
+                }
+            }
+
+            let va = res.data.verifyArgs
+            va.publicKey.challenge = encoder.encode(va.publicKey.challenge).buffer
+
+            try {
+                cred = await navigator.credentials.get(va)
+            } catch (err) {
+                if (err instanceof DOMException) {
+                    console.log('Verification action cancelled')
+                }
+            }
+
+            let verifyData
+            if(cred) {
+                const clientDataHash = await crypto.subtle.digest("SHA-256", cred.response.clientDataJSON)
+                const signedData = new Uint8Array(cred.response.authenticatorData.byteLength + clientDataHash.byteLength)
+                signedData.set(new Uint8Array(cred.response.authenticatorData), 0)
+                signedData.set(new Uint8Array(clientDataHash), cred.response.authenticatorData.byteLength)
+
+                verifyData = {
+                    fn: 'discover-verify',
+                    next: 'end',
+                    aarverify: await cred.toJSON(),
+                    signedData: bufferToBase64url(signedData),
+                    errno: 101
+                }
+            } else {
+                verifyData = {
+                    fn: 'discover-verify',
+                    next: 'end',
+                    aarverify: null,
+                    errno: 4
+                }
+            }
+
+            return await connectPost(verifyData, lpkStepUrlFor(apiUrl, 'discover-verify')).then((verifyRes) => {
+                if(verifyRes && verifyRes.end) return verifyRes
+                return lpk.action(lpkStepUrlFor(apiUrl, 'end'), verifyRes)
+            })
         })
     }
 }

@@ -26,8 +26,16 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
         $passkeyButton->icon = 'key';
         $passkeyButton->attr('href', '#');
 
+        $discoverButton = wire('modules')->get('InputfieldButton');
+        $discoverButton->attr('id+name', 'lpk_discover');
+        $discoverButton->addClass('top_button');
+        $discoverButton->attr('value', $lpk->_("Login with PassKey only"));
+        $discoverButton->icon = 'key';
+        $discoverButton->attr('href', '#');
+
         $pwdFld = $form->get('login_pass');
         $form->insertBefore($passkeyButton, $pwdFld);
+        $form->insertBefore($discoverButton, $pwdFld);
 
         $markUp = $modules->get('InputfieldMarkup');
         $markUp->attr('id+name', 'end');
@@ -47,19 +55,31 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
             // hacky solution for iOS not always honouring DOMContentLoaded
             function runOnStart() {
                 const btn = document.getElementById('lpk')
+                const discoverBtn = document.getElementById('lpk_discover')
                 let end = document.getElementById('end')
+
+                const handleResult = (res) => {
+                    if(res && res.errno && res.errno === 101 && res.goto) {
+                        window.location.href = res.goto
+                    }
+                    if(res && res.errno && res.msg) {
+                        end.textContent = res.msg
+                    }
+                }
         
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault()
-                    lpk.action(apiUrl + 'start').then (res => {
-                        if(res && res.errno && res.errno === 101 && res.goto) {
-                            window.location.href = res.goto
-                        }
-                        if(res && res.errno && res.msg) {
-                            end.textContent = res.msg
-                        }
+                if(btn) {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault()
+                        lpk.action(apiUrl + 'start').then(handleResult)
                     })
-                })
+                }
+
+                if(discoverBtn) {
+                    discoverBtn.addEventListener('click', (e) => {
+                        e.preventDefault()
+                        lpk.discover(apiUrl).then(handleResult)
+                    })
+                }
             }
         
             if(document.readyState !== 'loading') {

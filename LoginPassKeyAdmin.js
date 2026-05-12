@@ -15,8 +15,10 @@ function runOnStart() {
     btn.addEventListener('click', (e) => {
         e.preventDefault()
 
-        lpk.action(`${apiUrl}start`).then (res => {
-            console.log(res)
+        const userFld = document.getElementById('login_name')
+        const action = userFld && userFld.value.trim() ? lpk.action(apiUrl + 'start') : lpk.discover(apiUrl)
+
+        action.then (res => {
             if(res && res.errno) {
                 if(res.errno !== 101) {
                     document.getElementById('end').textContent = res.msg
@@ -35,4 +37,3 @@ if(document.readyState !== 'loading') {
         runOnStart()
     });
 }
-

@@ -16,7 +16,7 @@
 $info = [
     'title' => 'Login with a PassKey for ProcessWire',
     'author' => 'Clip magic',
-    'version' => '0.0.4Beta',
+    'version' => '0.1.0',
     'summary' => 'ProcessWire module that enables login with a passkey',
     'icon' => 'key',
     'autoload' => true,

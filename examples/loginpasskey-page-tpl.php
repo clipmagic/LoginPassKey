@@ -70,6 +70,7 @@
         </label>
         <input id="login_name" name="login_name" type="text" class="ProcessLoginName webauthn" autocomplete="username webauthn" required>
         <button id="lpk" type="button">Passkey</button>
+        <button id="lpk_discover" type="button">Passkey only</button>
     </form>
 
     <div id="end">
@@ -84,24 +85,34 @@
     // hacky solution for iOS not always honouring DOMContentLoaded
     function runOnStart() {
         const btn = document.getElementById('lpk')
+        const discoverBtn = document.getElementById('lpk_discover')
         let end = document.getElementById('end')
         if(!btn || !end) return
 
+        const handleResult = (res) => {
+            if(res && res.errno === 101 && res.goto) {
+                window.location.href = res.goto
+                return
+            }
+
+            if(res && res.msg) {
+                end.textContent = res.msg
+            } else if(res && res.error) {
+                end.textContent = res.error
+            }
+        }
+
         btn.addEventListener('click', (e) => {
             e.preventDefault()
-            lpk.action(apiUrl + 'start').then (res => {
-                if(res && res.errno === 101 && res.goto) {
-                    window.location.href = res.goto
-                    return
-                }
-
-                if(res && res.msg) {
-                    end.textContent = res.msg
-                } else if(res && res.error) {
-                    end.textContent = res.error
-                }
-            })
+            lpk.action(apiUrl + 'start').then(handleResult)
         })
+
+        if(discoverBtn) {
+            discoverBtn.addEventListener('click', (e) => {
+                e.preventDefault()
+                lpk.discover(apiUrl).then(handleResult)
+            })
+        }
     }
 
     if(document.readyState !== 'loading') {

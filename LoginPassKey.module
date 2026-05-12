@@ -76,6 +76,18 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $field->attr('checked', 'checked');
         }
         $fieldset->add($field);
+        // Enable passkey-only login with discoverable credentials
+        $field = $modules->get('InputfieldCheckbox');
+        $field->name = 'enabledDiscover';
+        $field->value = null;
+        $field->columnWidth	= 50;
+        $field->label = $this->_("Enable passkey-only login");
+        $field->notes = $this->_("When enabled, new passkey registrations request discoverable credentials. Existing username/email + passkey logins continue to work.");
+        if (isset($data['enabledDiscover']) && $data['enabledDiscover'] !== '') {
+            $field->value = $data['enabledDiscover'];
+            $field->attr('checked', 'checked');
+        }
+        $fieldset->add($field);
 
 
         $fields->add($fieldset);
@@ -511,19 +523,39 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                         $feUser = $this->getUserByField($username);
                         $session->setFor('lpk', 'success', 'success');
                         $session->forceLogin($feUser);
-                        $lpkConfig = $modules->getConfig('LoginPassKey');
 
-                        if ($session->getFor('lpk', 'inadmin')) {
-                            $processLogin = $modules->get('ProcessLogin');
-                            $processLogin->execute();
-                        } elseif ($modules->isInstalled('LoginRegisterPro') && $lpkConfig['enabled'] === 1) {
-                            $processLogin = $modules->get('LoginRegisterPro');
-                            $processLogin->execute();
-                        } elseif (!empty($lpkConfig['redirect_url'])) {
-                            $lpkData->goto = $this->getRedirectUrl();
-                        } else {
-                            $lpkData->goto = $pages->get(1)->httpUrl;
-                        }
+                        $this->finishVerifiedLogin($lpkData);
+                    }
+                }
+                break;
+
+            case 'discover-start':
+                if ((int) $this->enabledDiscover !== 1) {
+                    $lpkData->data->msg = $this->getErrorMessage(61);
+                    $lpkData->data->errno = 61;
+                    $lpkData->data->next = 'end';
+                } else {
+                    $lpkData->data->verifyArgs = $this->discoverUser();
+                    $lpkData->data->next = 'discover-verify';
+                }
+                break;
+
+            case 'discover-verify':
+                $errno = $data->errno ?? 4;
+                if (($errno && $errno !== 101) || empty($data->aarverify)) {
+                    $lpkData->msg = $this->getErrorMessage($errno);
+                    $lpkData->errno = $errno;
+                    $lpkData->data->next = 'end';
+                } else {
+                    $verified = $this->verifyDiscoverResponse($data->aarverify, $data->signedData ?? null);
+
+                    $lpkData->data = $verified;
+                    if ($verified->errno === 101) {
+                        $lpkData->msg = $this->getErrorMessage(101);
+                        $session->setFor('lpk', 'success', 'success');
+                        $session->forceLogin($verified->user);
+                        unset($lpkData->data->user);
+                        $this->finishVerifiedLogin($lpkData);
                     }
                 }
                 break;
@@ -535,6 +567,32 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
 
         return $lpkData;
+    }
+
+    protected function finishVerifiedLogin(\stdClass $lpkData): void
+    {
+        $session = $this->wire('session');
+        $modules = $this->wire('modules');
+        $pages = $this->wire('pages');
+        $lpkConfig = $modules->getConfig('LoginPassKey');
+
+        if ($session->getFor('lpk', 'inadmin')) {
+            $processLogin = $modules->get('ProcessLogin');
+            $processLogin->execute();
+        } elseif ($modules->isInstalled('LoginRegisterPro') && $lpkConfig['enabled'] === 1) {
+            $processLogin = $modules->get('LoginRegisterPro');
+            $processLogin->execute();
+        } elseif (!empty($lpkConfig['redirect_url'])) {
+            $lpkData->goto = $this->getRedirectUrl();
+            if (isset($lpkData->data) && $lpkData->data instanceof \stdClass) {
+                $lpkData->data->goto = $lpkData->goto;
+            }
+        } else {
+            $lpkData->goto = $pages->get(1)->httpUrl;
+            if (isset($lpkData->data) && $lpkData->data instanceof \stdClass) {
+                $lpkData->data->goto = $lpkData->goto;
+            }
+        }
     }
 
     public function getDatabase()
@@ -717,6 +775,22 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         }
     }
 
+    private function _getCredentialByCredentialId(string $credentialId)
+    {
+        try {
+            $db = wire('database');
+            $sql = "SELECT `user_id`, `credential_id`, `public_key` FROM " . $this->getTableName() . " WHERE credential_id=:credential_id LIMIT 1";
+            $query = $db->prepare($sql);
+            $query->bindValue(":credential_id", $credentialId);
+            $query->closeCursor();
+            $query->execute();
+            $result = $query->fetch(\PDO::FETCH_ASSOC);
+            return $result ?: null;
+        } catch (WireException $e) {
+            return "Database Error: " . $e->getMessage();
+        }
+    }
+
     public function prepareToValidate($user)
     {
         $existingCredentials = $this->_getCredentialsFromDB($user);
@@ -796,8 +870,9 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $args->publicKey->authenticatorSelection = new \stdClass();
         $args->publicKey->authenticatorSelection->userVerification = $this->userVerification;
 
-        $args->publicKey->authenticatorSelection->residentKey = $this->residentKey;
-        $args->publicKey->authenticatorSelection->requireResidentKey = false;
+        $requireDiscoverable = (int) $this->enabledDiscover === 1;
+        $args->publicKey->authenticatorSelection->residentKey = $requireDiscoverable ? 'required' : $this->residentKey;
+        $args->publicKey->authenticatorSelection->requireResidentKey = $requireDiscoverable;
 
         $crossPlatformAttachment = in_array($this->crossPlatformAttachment, ['platform', 'cross-platform'])
             ? $this->crossPlatformAttachment
@@ -924,6 +999,20 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return $output;
     }
 
+    public function discoverUser()
+    {
+        $lpkArgs = $this->getlpkargs();
+
+        $output = new \stdClass();
+        $output->publicKey = new \stdClass();
+        $output->publicKey->timeout = 420000000; // microseconds = 7mins
+        $output->publicKey->challenge = $this->_createChallenge();
+        $this->wire('session')->setFor('lpk', 'verifyChallenge', $this->base64url_encode($output->publicKey->challenge));
+        $output->publicKey->userVerification = $this->userVerification;
+        $output->publicKey->rpId = $lpkArgs->rp;
+        return $output;
+    }
+
 //    public function verifyResponse($authenticatorAttestationResponse = null, $challenge = null)
     public function verifyResponse($credData = null, $challenge = null, $signedData = null)
     {
@@ -1037,6 +1126,87 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         return $output;
     }
 
+    public function verifyDiscoverResponse($credData = null, $signedData = null)
+    {
+        $output = new \stdClass();
+        $output->fn = 'discover-verify';
+        $output->msg = $this->getErrorMessage(4);
+        $output->errno = 4;
+        $output->next = 'end';
+
+        if (empty($credData) || empty($credData->id) || empty($credData->response)) {
+            return $output;
+        }
+
+        $sanitizer = $this->wire('sanitizer');
+        $session = $this->wire('session');
+        $users = $this->wire('users');
+
+        $userPassKey = $this->_getCredentialByCredentialId($credData->id);
+        if (!\is_array($userPassKey)) {
+            return $output;
+        }
+
+        $clientDataJSON = $this->base64url_decode($credData->response->clientDataJSON ?? '');
+        $clientData = \json_decode($clientDataJSON);
+        if (!$clientData) {
+            return $output;
+        }
+
+        $getArgs = $this->getlpkargs();
+        if ($clientData->origin !== "https://" . $getArgs->rp) {
+            return $output;
+        }
+
+        $expectedChallenge = $session->getFor('lpk', 'verifyChallenge');
+        $session->removeFor('lpk', 'verifyChallenge');
+        if (empty($expectedChallenge) || $expectedChallenge !== $clientData->challenge) {
+            $output->msg = $this->_('Challenge did not match');
+            return $output;
+        }
+
+        if ($credData->id !== $userPassKey['credential_id']) {
+            return $output;
+        }
+
+        if (empty($credData->response->signature) || empty($credData->response->userHandle) || empty($signedData)) {
+            return $output;
+        }
+
+        $userHandle = $sanitizer->int($this->base64url_decode($credData->response->userHandle));
+        $credentialUserId = $sanitizer->int($userPassKey['user_id']);
+        if ($credentialUserId < 1 || $credentialUserId !== $userHandle) {
+            return $output;
+        }
+
+        $feUser = $users->get($credentialUserId);
+        if (!$feUser instanceof User || $feUser instanceof NullPage || $feUser->isGuest() || !$this->userAllowed($feUser)) {
+            return $output;
+        }
+
+        $publicKey = $userPassKey['public_key'];
+        if (strpos($publicKey, 'BEGIN PUBLIC KEY') === false) {
+            $publicKey = $this->publicKeyToPem($publicKey);
+        }
+
+        $signedData = $this->base64url_decode($signedData);
+        $signature = $this->base64url_decode($credData->response->signature);
+        $key = openssl_pkey_get_public($publicKey);
+
+        if (!$key) {
+            return $output;
+        }
+
+        $isValid = openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
+        if ($isValid === 1) {
+            $output->msg = $this->getErrorMessage(101);
+            $output->errno = 101;
+            $output->user = $feUser;
+        }
+
+        return $output;
+    }
+
     public function getlpkargs()
     {
         $data = wire('modules')->getConfig($this);
@@ -1082,6 +1252,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
                 return $this->_('Please login with your password to register your passkey');
             case 60:
                 return $this->_("No username provided");
+            case 61:
+                return $this->_("Passkey-only login is not enabled");
             case 65:
                 return $this->_("No user with name: ");
             case 66:
@@ -1182,7 +1354,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $template->filename = $this->config->paths->templates . 'lpk-api.php';
             $template->noChildren = 1;
             $template->noParents = -1; // one page only
-            $template->urlSegments = "start register verify end";
+            $template->urlSegments = 1;
             $template->contentType = "json";
             $template->https = 1; // always only https
             $template->noAppendTemplateFile = 1; // disable auto-append of eg _main.php
@@ -1207,6 +1379,23 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
             $apiPage->title = $this->_('LoginPassKey API');
             $apiPage->status(['hidden', 'published']);
             $apiPage->save();
+        }
+    }
+
+    public function ___upgrade($fromVersion, $toVersion)
+    {
+        $this->ensureApiTemplateUrlSegments();
+    }
+
+    protected function ensureApiTemplateUrlSegments(): void
+    {
+        $templates = $this->wire('templates');
+        $template = $templates->get('name=lpk-api');
+        if (!$template instanceof Template) return;
+
+        if ((int) $template->urlSegments !== 1) {
+            $template->urlSegments = 1;
+            $templates->save($template);
         }
     }
 

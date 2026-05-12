@@ -15,6 +15,8 @@ require_once __DIR__ . '/LoginPassKeyAppApi.php';
     ['POST', 'finduser', LoginPassKeyAppApi::class, 'findUser'],
     ['POST', 'register', LoginPassKeyAppApi::class, 'register'],
     ['POST', 'verify',   LoginPassKeyAppApi::class, 'verify'],
+    ['POST', 'discover-start',  LoginPassKeyAppApi::class, 'discoverStart'],
+    ['POST', 'discover-verify', LoginPassKeyAppApi::class, 'discoverVerify'],
     ['POST', 'end',      LoginPassKeyAppApi::class, 'end']
 ]
 
@@ -46,6 +48,16 @@ class LoginPassKeyAppApi
     public static function verify($data) :\stdClass | bool
     {
         return self::handleStep($data, 'verify');
+    }
+
+    public static function discoverStart($data) :\stdClass | bool
+    {
+        return self::handleStep($data, 'discover-start');
+    }
+
+    public static function discoverVerify($data) :\stdClass | bool
+    {
+        return self::handleStep($data, 'discover-verify');
     }
 
     public static function end($data) :\stdClass | bool
