@@ -51,6 +51,9 @@ In short, passkeys offer improved security and convenience compared to tradition
 
 <a id="how-it-works-short-version"></a>
 ## How it works (Short version)
+
+![LoginPassKey passkey login workflow](images/loginpasskey-how-it-works-simple.png)
+
 LoginPassKey supports three login methods on the same site:
 
 1. username/email + password
@@ -65,6 +68,7 @@ The browser, server and device have a 3-way conversation answering the following
 The user must be **logged in with a password to register a passkey**.
 
 The user must be **logged out to verify an existing passkey**.
+
 <a id="how-it-works-long-version-tldr"></a>
 ## How it works (Long version TLDR;)
 For username/email + passkey login, the user clicks a button, then:
