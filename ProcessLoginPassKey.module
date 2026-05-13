@@ -34,6 +34,10 @@ class ProcessLoginPassKey extends ProcessModule
     {
         $modules = $this->wire()->modules;
         $input = $this->wire('input');
+        $search = $this->getSearchQuery();
+        if ($search !== '') {
+            $input->whitelist('q', $search);
+        }
 
         $form = $modules->get('InputfieldForm');
 
@@ -65,9 +69,9 @@ class ProcessLoginPassKey extends ProcessModule
         $markup .= "</p>";
         $f->set('value', $markup);
 
-        $pagination = $this->renderPagination();
+        $pagination = $this->renderPagination($search);
 
-        $form->set('value', $f->value . $this->getPassKeys($table, $checkbox) . $pagination);
+        $form->set('value', $f->value . $this->getPassKeys($table, $checkbox, $search) . $pagination);
 
         /** @var InputfieldButton $f */
         $f = $modules->get('InputfieldSubmit');
@@ -85,23 +89,45 @@ class ProcessLoginPassKey extends ProcessModule
                 $this->session->redirect($this->wire()->page->url);
             }
         }
-        return $form->render();
+        return $this->renderSearchForm($search) . $form->render();
     }
 
-    public function renderPagination()
+    protected function getSearchQuery(): string
+    {
+        return trim((string) $this->wire('sanitizer')->text($this->wire('input')->get('q')));
+    }
+
+    protected function renderSearchForm(string $search): string
+    {
+        $sanitizer = $this->wire('sanitizer');
+        $action = $sanitizer->entities($this->wire('page')->url);
+        $value = $sanitizer->entities($search);
+        $label = $this->_('Search passkeys');
+        $placeholder = $this->_('User ID, passkey ID, username, or created date');
+        $submit = $this->_('Search');
+        $reset = $this->_('Reset');
+        $resetUrl = $sanitizer->entities($this->wire('page')->url);
+
+        return <<<HTML
+<form method="get" action="$action" class="InputfieldForm LoginPassKeySearchForm">
+    <label for="lpk_passkey_search">$label</label>
+    <input type="search" id="lpk_passkey_search" name="q" value="$value" placeholder="$placeholder">
+    <button type="submit" class="ui-button ui-widget ui-corner-all">$submit</button>
+    <a href="$resetUrl" class="ui-button ui-widget ui-corner-all">$reset</a>
+</form>
+HTML;
+    }
+
+    public function renderPagination(string $search = '')
     {
         $input = $this->wire('input');
-        //    $items_per_page = 2;
         $start = ($input->pageNum - 1) * $this->limit;
-        $total = (int)$this->countCredentialsInDb();
-
-        $passKeys = $this->getAllCredentialsFromDB();
-
-        $listed = array_slice($passKeys, $start, $this->limit); // Key difference
+        $total = (int)$this->countCredentialsInDb($search);
 
         $a = new PageArray();
         $a->setDuplicateChecking(false);
-        foreach ($listed as $listing) $a->add(new Page());
+        $listed = max(0, min($this->limit, $total - $start));
+        for ($n = 0; $n < $listed; $n++) $a->add(new Page());
 
         $a->setTotal($total);
         $a->setLimit($this->limit);
@@ -110,7 +136,7 @@ class ProcessLoginPassKey extends ProcessModule
         return $a->renderPager();
     }
 
-    public function getAllCredentialsFromDB()
+    public function getAllCredentialsFromDB(string $search = '')
     {
         $lpk = $this->wire('modules')->get('LoginPassKey');
         $input = $this->wire('input');
@@ -118,30 +144,65 @@ class ProcessLoginPassKey extends ProcessModule
 
         try {
             $db = wire('database');
-            $sql = "SELECT `id`, `user_id`, `created` from " . $lpk->getTableName() . " LIMIT " . $offset . "," . $this->limit;
+            [$where, $params] = $this->getSearchSql($search);
+            $sql = "SELECT lpk.`id`, lpk.`user_id`, COALESCE(p.`name`, '') AS `username`, lpk.`created` " .
+                "FROM " . $lpk->getTableName() . " lpk " .
+                "LEFT JOIN `pages` p ON p.`id`=lpk.`user_id` " .
+                $where .
+                " ORDER BY lpk.`created` DESC, lpk.`id` DESC LIMIT :limit OFFSET :offset";
             $query = $db->prepare($sql);
+            foreach ($params as $name => $value) {
+                $query->bindValue($name, $value, is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+            }
+            $query->bindValue(':limit', (int) $this->limit, \PDO::PARAM_INT);
+            $query->bindValue(':offset', (int) $offset, \PDO::PARAM_INT);
             $query->closeCursor();
             $query->execute();
             $result = $query->fetchAll(\PDO::FETCH_OBJ);
             return $result;
-        } catch (WireException $e) {
-            return "Database Error: " . $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return [];
         }
     }
 
-    public function countCredentialsInDb()
+    public function countCredentialsInDb(string $search = '')
     {
         $lpk = $this->wire('modules')->get('LoginPassKey');
         $db = wire('database');
         try {
-            $sql = "SELECT COUNT(id) FROM " . $lpk->getTableName();
+            [$where, $params] = $this->getSearchSql($search);
+            $sql = "SELECT COUNT(lpk.`id`) FROM " . $lpk->getTableName() . " lpk " .
+                "LEFT JOIN `pages` p ON p.`id`=lpk.`user_id` " .
+                $where;
             $query = $db->prepare($sql);
+            foreach ($params as $name => $value) {
+                $query->bindValue($name, $value, is_int($value) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+            }
             $query->closeCursor();
             $query->execute();
             return $query->fetchColumn();
-        } catch (WireException $e) {
-            return "Database Error: " . $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return 0;
         }
+    }
+
+    protected function getSearchSql(string $search): array
+    {
+        if ($search === '') {
+            return ['', []];
+        }
+
+        $where = " WHERE p.`name` LIKE :search_like OR lpk.`created` LIKE :search_like";
+        $params = [':search_like' => '%' . $search . '%'];
+
+        if (ctype_digit($search)) {
+            $where .= " OR lpk.`id`=:search_id OR lpk.`user_id`=:search_id";
+            $params[':search_id'] = (int) $search;
+        }
+
+        return [$where, $params];
     }
 
     public function ___deletePassKeys($form)
@@ -165,26 +226,23 @@ class ProcessLoginPassKey extends ProcessModule
         } catch (WireException $e) {
             throw new WireException("An error occurred while trying to delete: " . $e->getMessage());
         }
-        return \count($ids);
+        return $query->rowCount();
     }
 
-    public function ___getPassKeys($table, $checkbox)
+    public function ___getPassKeys($table, $checkbox, string $search = '')
     {
         $sanitizer = $this->wire('sanitizer');
-        $users = $this->wire('users');
 
-        //$lpk = $modules->get("LoginPassKey");
-        $passkeys = $this->getAllCredentialsFromDB();
+        $passkeys = $this->getAllCredentialsFromDB($search);
 
         if (\count($passkeys) === 0) {
-            $table->row(['', $this->_("There are no passkeys."), '', '']);
+            $table->row(['', '', $this->_("There are no matching passkeys."), '', '']);
         }
         foreach ($passkeys as $passkey => $v) {
             $checkbox->attr('id', "delete_" . $sanitizer->int($v->id));
             $checkbox->attr('value', $v->id);
 
-            $user = $users->get($v->user_id);
-            $userName = $user instanceof NullPage ? $this->_('Unknown user') : $user->name;
+            $userName = $v->username !== '' ? $v->username : $this->_('Unknown user');
             $table->row([$v->id, $v->user_id, $userName, $v->created, $checkbox->render(),]);
         }
         return $table->render();

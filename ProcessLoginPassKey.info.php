@@ -15,10 +15,10 @@
 $info = [
     'title' => 'ProcessLoginPassKey',
     'summary' => 'Manage your LoginPassKeys',
-    'version' => '0.2.0',
+    'version' => '0.3.0',
     'author' => 'Clip Magic',
     'icon' => 'key',
-    'requires' =>[ "ProcessWire>=3.0.246,", "LoginPassKey"],
+    'requires' => ["ProcessWire>=3.0.246", "LoginPassKey"],
     'href' => 'https://processwire.com/modules/login-pass-key/',
     'permission' => 'passkeys',
     'permissions' => [

@@ -160,13 +160,15 @@ let lpk = {
                     registerData = {
                         fn: 'register',
                         next: 'end',
-                        aarcreate: await cred.toJSON()
+                        aarcreate: await cred.toJSON(),
+                        csrf: fwd.data.csrf || ''
                     }
                 } else {
                     registerData = {
                         fn: 'register',
                         next: 'end',
-                        aarcreate: null
+                        aarcreate: null,
+                        csrf: fwd.data.csrf || ''
                     }
                 }
                 // Progress to the next step in the process
@@ -196,7 +198,12 @@ let lpk = {
 
                 let va = fwd.data.verifyArgs
                 va.publicKey.challenge  = encoder.encode(va.publicKey.challenge).buffer;
-                va.publicKey.allowCredentials = []
+                if(va.publicKey.allowCredentials && va.publicKey.allowCredentials.length > 0) {
+                    va.publicKey.allowCredentials.forEach(c => {
+                        c.id = base64urlToBuffer(c.id)
+                        return c
+                    })
+                }
 
                 //get credentials
                 try {
@@ -209,16 +216,10 @@ let lpk = {
 
                 let verifyData
                 if(cred) {
-                    const clientDataHash = await crypto.subtle.digest("SHA-256", cred.response.clientDataJSON);
-                    const signedData = new Uint8Array(cred.response.authenticatorData.byteLength + clientDataHash.byteLength);
-                    signedData.set(new Uint8Array(cred.response.authenticatorData), 0);
-                    signedData.set(new Uint8Array(clientDataHash), cred.response.authenticatorData.byteLength);
-
                     verifyData = {
                         fn: "verify",
                         next: "end",
                         aarverify: await cred.toJSON(),
-                        signedData: bufferToBase64url(signedData),
                         errno: 101
                     }
 
@@ -347,16 +348,10 @@ let lpk = {
 
             let verifyData
             if(cred) {
-                const clientDataHash = await crypto.subtle.digest("SHA-256", cred.response.clientDataJSON)
-                const signedData = new Uint8Array(cred.response.authenticatorData.byteLength + clientDataHash.byteLength)
-                signedData.set(new Uint8Array(cred.response.authenticatorData), 0)
-                signedData.set(new Uint8Array(clientDataHash), cred.response.authenticatorData.byteLength)
-
                 verifyData = {
                     fn: 'discover-verify',
                     next: 'end',
                     aarverify: await cred.toJSON(),
-                    signedData: bufferToBase64url(signedData),
                     errno: 101
                 }
             } else {
@@ -495,4 +490,15 @@ function bufferToBase64url(buffer) {
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '');
+}
+
+function base64urlToBuffer(value) {
+    const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - base64.length % 4) % 4), '=');
+    const binary = atob(padded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
 }

@@ -3,6 +3,9 @@
   "description": "ProcessWire module enabling users to login with passkeys",
   "minimum-stability": "stable",
   "license": "MIT",
+  "require": {
+    "lbuchs/webauthn": "^2.0"
+  },
   "authors": [
     {
       "name": "Prue Rowland",

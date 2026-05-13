@@ -25,13 +25,15 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 //    public $attestationFormat = 'none';
     public $attestationFormat = 'none';
 
-    public $userVerification = 'preferred';
+    public $userVerification = 'required';
 
     public $residentKey = 'preferred';
 
     public $userDisplayName = null;
 
     public $crossPlatformAttachment = null;
+
+    protected const REGISTER_CSRF_ID = 'loginpasskey-register';
 
     public function getModuleConfigInputfields(array $data)
     {
@@ -114,6 +116,19 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field->notes($this->_("Leave blank to default to config->host")) ;
         $field->value = !empty($data['rp']) ? $sanitizer->text($data['rp']) : $this->wire('config')->httpHost;
         $fieldset->add($field);
+
+        // User verification
+        $field = $modules->get('InputfieldRadios');
+        $field->name = 'userVerification';
+        $field->label = $this->_("User verification");
+        $field->columnWidth	= 50;
+        $field->notes = $this->_("Required is recommended. Lower settings may allow passkey use without biometric/PIN verification on some authenticators.");
+        $field->addOption('required', $this->_('Required'));
+        $field->addOption('preferred', $this->_('Preferred'));
+        $field->addOption('discouraged', $this->_('Discouraged'));
+        $field->value = !empty($data['userVerification']) ? $sanitizer->option($data['userVerification'], ['required', 'preferred', 'discouraged']) : $this->userVerification;
+        $fieldset->add($field);
+
         $fields->add($fieldset);
 
         // ProcessWire User settings
@@ -411,6 +426,8 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     public function registerAdmin(HookEvent $event) {
 
         // Offer passkey registration to an eligible logged-in admin user.
+        if ($this->wire('input')->requestMethod('POST')) return;
+
         $user = $this->wire('user');
 
         $lpk = $this->wire('modules')->get('LoginPassKey');
@@ -427,6 +444,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
             $data = new \stdClass();
             $data->pk = $lpk->preRegisterUser($user);
+            $data->csrf = $this->getRegisterCsrfToken();
             $data->next = 'register';
 
             $fwd->data = $data;
@@ -596,6 +614,7 @@ HTML;
 
         $data = new \stdClass();
         $data->pk = $this->preRegisterUser($user);
+        $data->csrf = $this->getRegisterCsrfToken();
         $data->next = 'register';
         $fwd->data = $data;
 
@@ -658,6 +677,13 @@ HTML;
 
     public function handleApiStep($data, string $step): \stdClass
     {
+        if (!$this->apiRequestIsPost()) {
+            if (!\headers_sent()) {
+                \header('Allow: POST', true, 405);
+            }
+            return $this->apiError($this->_('Method not allowed'), 405);
+        }
+
         if (!$data instanceof \stdClass) {
             $data = new \stdClass();
         }
@@ -688,6 +714,7 @@ HTML;
                             $lpkData->data->next = 'verify';
                         } elseif ($nextAction === 'register' && $user->isLoggedIn() && $user->id === $feUserObj->id) {
                             $lpkData->data->pk = $this->preRegisterUser($feUserObj);
+                            $lpkData->data->csrf = $this->getRegisterCsrfToken();
                             $lpkData->data->feUserid = $feUserObj->id;
                             $lpkData->data->next = 'register';
                         } elseif ($nextAction === 'register') {
@@ -708,6 +735,11 @@ HTML;
                 $lpkData->data = new \stdClass();
 
                 if (!empty($data->aarcreate)) {
+                    if (!$this->registerCsrfValid($data)) {
+                        $lpkData = $this->apiError($this->_('Invalid session'), 403);
+                        break;
+                    }
+
                     $created = $this->registerUser($user, $data->aarcreate);
 
                     if (!!$created) {
@@ -781,6 +813,21 @@ HTML;
         }
 
         return $lpkData;
+    }
+
+    protected function apiRequestIsPost(): bool
+    {
+        return $this->wire('input')->requestMethod('POST');
+    }
+
+    protected function apiError(string $message, int $errno): \stdClass
+    {
+        $output = new \stdClass();
+        $output->end = true;
+        $output->msg = $message;
+        $output->errno = $errno;
+        $output->next = 'end';
+        return $output;
     }
 
     protected function finishVerifiedLogin(\stdClass $lpkData): void
@@ -1026,14 +1073,15 @@ HTML;
     {
         try {
             $db = wire('database');
-            $sql = "SELECT `credential_id`, `public_key` from " . $this->getTableName() . " where user_id=" . $user->id;
+            $sql = "SELECT `id`, `credential_id`, `public_key`, `sign_count` from " . $this->getTableName() . " where user_id=" . $user->id;
             $query = $db->prepare($sql);
             $query->closeCursor();
             $query->execute();
             $result = $query->fetchAll(\PDO::FETCH_ASSOC);
             return $result;
-        } catch (WireException $e) {
-            return "Database Error: " . $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return [];
         }
     }
 
@@ -1041,15 +1089,16 @@ HTML;
     {
         try {
             $db = wire('database');
-            $sql = "SELECT `user_id`, `credential_id`, `public_key` FROM " . $this->getTableName() . " WHERE credential_id=:credential_id LIMIT 1";
+            $sql = "SELECT `id`, `user_id`, `credential_id`, `public_key`, `sign_count` FROM " . $this->getTableName() . " WHERE credential_id=:credential_id LIMIT 1";
             $query = $db->prepare($sql);
             $query->bindValue(":credential_id", $credentialId);
             $query->closeCursor();
             $query->execute();
             $result = $query->fetch(\PDO::FETCH_ASSOC);
             return $result ?: null;
-        } catch (WireException $e) {
-            return "Database Error: " . $e->getMessage();
+        } catch (\Throwable $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return null;
         }
     }
 
@@ -1094,21 +1143,27 @@ HTML;
             (
              user_id, 
              credential_id,
-             public_key
+             public_key,
+             sign_count
              ) 
             VALUES 
             ( 
              :user_id,
              :credential_id,
-             :public_key
+             :public_key,
+             :sign_count
             )
         SQL;
 
-        $pem = $this->publicKeyToPem($created->publicKey);
+        $pem = strpos($created->publicKey, 'BEGIN PUBLIC KEY') !== false
+            ? $created->publicKey
+            : $this->publicKeyToPem($created->publicKey);
+        $signCount = (int) ($created->signCount ?? 0);
         $query = $db->prepare($sql);
         $query->bindParam(":user_id", $userID);
         $query->bindParam(":credential_id", $credentialID);
         $query->bindParam(":public_key", $pem);
+        $query->bindParam(":sign_count", $signCount, \PDO::PARAM_INT);
         $query->closeCursor();
         return $query->execute() ? true : false;
     }
@@ -1181,6 +1236,7 @@ HTML;
         $args->publicKey->extensions->exts = true;
         $args->publicKey->timeout = 600000; // microseconds
         $args->publicKey->challenge = $this->_createChallenge(); // binary
+        $this->rememberRegistrationChallenge($user, $args->publicKey->challenge);
 
         // save challenge to the session in case we need it later
         //prevent re-registration by specifying existing credentials
@@ -1214,10 +1270,16 @@ HTML;
             return $output;
         }
 
-        $toDB = new \stdClass();
-        $toDB->user_id = $user->id;
-        $toDB->credentialId = $credData->id;
-        $toDB->publicKey = $credData->response->publicKey;
+        $expectedChallenge = $this->consumeRegistrationChallenge($user, $credData);
+        if (empty($expectedChallenge)) {
+            return $output;
+        }
+
+        $toDB = $this->verifyRegistrationAttestation($user, $credData, $expectedChallenge);
+        if (!$toDB) {
+            return $output;
+        }
+
         try {
             $output->created = $this->_saveCredentialToDB($toDB);
             if($output->created !== false) {
@@ -1231,6 +1293,167 @@ HTML;
             $output->errno = 2;
         }
         return $output;
+    }
+
+    protected function verifyRegistrationAttestation(User $user, $credData, string $expectedChallenge): ?\stdClass
+    {
+        if (!$this->loadWebAuthnLibrary()) {
+            $this->wire('log')->save($this->className(), 'Registration verification failed: lbuchs/webauthn is not installed');
+            return null;
+        }
+
+        if (empty($credData->id) || empty($credData->response->clientDataJSON) || empty($credData->response->attestationObject)) {
+            return null;
+        }
+
+        $clientDataJSON = $this->base64url_decode($credData->response->clientDataJSON);
+        $attestationObject = $this->base64url_decode($credData->response->attestationObject);
+        if ($clientDataJSON === false || $attestationObject === false) {
+            return null;
+        }
+
+        $lpkArgs = $this->getlpkargs();
+
+        try {
+            $clientData = \json_decode($clientDataJSON);
+            if (!$clientData || !$this->clientDataOriginAllowed($clientData, $lpkArgs->rp)) {
+                return null;
+            }
+
+            $webauthn = new \lbuchs\WebAuthn\WebAuthn(
+                $lpkArgs->appname,
+                $lpkArgs->rp,
+                ['none', 'packed', 'apple'],
+                true
+            );
+
+            $verified = $webauthn->processCreate(
+                $clientDataJSON,
+                $attestationObject,
+                $expectedChallenge,
+                $this->userVerification === 'required',
+                true,
+                true
+            );
+        } catch (\Throwable $e) {
+            $this->wire('log')->save($this->className(), 'Registration verification failed: ' . $e->getMessage());
+            return null;
+        }
+
+        $credentialId = $this->base64url_encode($verified->credentialId);
+        if (!hash_equals($credentialId, (string) $credData->id)) {
+            $this->wire('log')->save($this->className(), 'Registration verification failed: credential ID mismatch');
+            return null;
+        }
+
+        $toDB = new \stdClass();
+        $toDB->user_id = $user->id;
+        $toDB->credentialId = $credentialId;
+        $toDB->publicKey = $verified->credentialPublicKey;
+        $toDB->signCount = (int) ($verified->signatureCounter ?? 0);
+        return $toDB;
+    }
+
+    protected function rememberRegistrationChallenge(User $user, string $challenge): void
+    {
+        $session = $this->wire('session');
+        $pending = $session->getFor('lpk', 'registerChallenges');
+        $pending = \is_array($pending) ? $pending : [];
+        $now = \time();
+
+        foreach ($pending as $hash => $entry) {
+            if (!\is_array($entry) || ($entry['created'] ?? 0) < $now - 600) {
+                unset($pending[$hash]);
+            }
+        }
+
+        $pending[\hash('sha256', $challenge)] = [
+            'challenge' => $challenge,
+            'user_id' => (int) $user->id,
+            'created' => $now,
+        ];
+
+        if (\count($pending) > 10) {
+            $pending = \array_slice($pending, -10, null, true);
+        }
+
+        $session->setFor('lpk', 'registerChallenges', $pending);
+        $session->removeFor('lpk', 'registerChallenge');
+    }
+
+    protected function consumeRegistrationChallenge(User $user, $credData): ?string
+    {
+        if (empty($credData->response->clientDataJSON)) {
+            return null;
+        }
+
+        $clientDataJSON = $this->base64url_decode($credData->response->clientDataJSON);
+        if ($clientDataJSON === false) {
+            return null;
+        }
+
+        $clientData = \json_decode($clientDataJSON);
+        if (!$clientData || empty($clientData->challenge) || !\is_string($clientData->challenge)) {
+            return null;
+        }
+
+        $clientChallenge = $this->base64url_decode($clientData->challenge);
+        if ($clientChallenge === false) {
+            return null;
+        }
+
+        $session = $this->wire('session');
+        $pending = $session->getFor('lpk', 'registerChallenges');
+        $pending = \is_array($pending) ? $pending : [];
+        $hash = \hash('sha256', $clientChallenge);
+        $entry = $pending[$hash] ?? null;
+
+        if (!\is_array($entry) || (int) ($entry['user_id'] ?? 0) !== (int) $user->id || empty($entry['challenge'])) {
+            $this->wire('log')->save($this->className(), sprintf(
+                'Registration challenge not pending: user_id=%d pending_count=%d',
+                (int) $user->id,
+                \count($pending)
+            ));
+            return null;
+        }
+
+        unset($pending[$hash]);
+        $session->setFor('lpk', 'registerChallenges', $pending);
+        return $entry['challenge'];
+    }
+
+    public function getRegisterCsrfToken(): string
+    {
+        return $this->wire('session')->CSRF->getTokenValue(self::REGISTER_CSRF_ID);
+    }
+
+    protected function registerCsrfValid($data): bool
+    {
+        if (!$this->wire('config')->protectCSRF) {
+            return true;
+        }
+
+        $submitted = isset($data->csrf) && \is_string($data->csrf) ? $data->csrf : '';
+        if ($submitted === '') {
+            return false;
+        }
+
+        $expected = $this->getRegisterCsrfToken();
+        return $expected !== '' && \hash_equals($expected, $submitted);
+    }
+
+    protected function loadWebAuthnLibrary(): bool
+    {
+        if (class_exists('\lbuchs\WebAuthn\WebAuthn')) {
+            return true;
+        }
+
+        $autoload = __DIR__ . '/vendor/autoload.php';
+        if (is_file($autoload)) {
+            require_once $autoload;
+        }
+
+        return class_exists('\lbuchs\WebAuthn\WebAuthn');
     }
 
     public function verifyUser($user) {
@@ -1324,7 +1547,7 @@ HTML;
             }
 
             // relying party hosts don't match
-            if($clientData->origin !== "https://" . $getArgs->rp) {
+            if(!$this->clientDataOriginAllowed($clientData, $getArgs->rp)) {
                 $output->msg = $this->_('Failed to decode client data');
                 return $output;
             }
@@ -1334,6 +1557,11 @@ HTML;
             $session->removeFor('lpk', 'verifyChallenge');
             if(empty($expectedChallenge) || $expectedChallenge !== $clientData->challenge) {
                 $output->msg = $this->_('Challenge did not match');
+                return $output;
+            }
+
+            if (!$this->authenticatorUserVerificationAllowed($credData)) {
+                $output->msg = $this->_('User verification was not performed');
                 return $output;
             }
 
@@ -1356,25 +1584,24 @@ HTML;
                 $publicKey = $userPassKey['public_key'];
             }
 
-            $signedData = $this->base64url_decode($signedData);
-            $signature = $this->base64url_decode($credData->response->signature);
-
-            $key = openssl_pkey_get_public($publicKey);
-
-            if (!$key) {
-                $output->msg = $this->_('Failed to open public key');
+            $isValid = $this->verifyAssertionSignature($credData, $publicKey);
+            if ($isValid !== 1) {
                 return $output;
-            } else {
-                $isValid = openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
-                if(!$isValid === 1) {
-                    return $output;
-                }
+            }
+
+            $newSignCount = $this->getAuthenticatorSignCount($credData);
+            if (!$this->credentialCounterValid($userPassKey, $newSignCount)) {
+                return $output;
             }
 
             // now check the user id's match
-            $userHandle = $sanitizer->int($this->base64url_decode($credData->response->userHandle));
+            $userHandle = $this->decodeUserHandleToInt($credData->response->userHandle ?? '');
+            if ($userHandle < 1) {
+                return $output;
+            }
 
             if ($userid === $userHandle && $isValid === 1) {
+                $this->updateCredentialSignCount($userPassKey, $newSignCount);
                 $session->setFor('lpk', 'success', 'success');
                 $output->msg = $this->getErrorMessage(101);
                 $output->errno = 101;
@@ -1416,7 +1643,7 @@ HTML;
         }
 
         $getArgs = $this->getlpkargs();
-        if ($clientData->origin !== "https://" . $getArgs->rp) {
+        if (!$this->clientDataOriginAllowed($clientData, $getArgs->rp)) {
             return $output;
         }
 
@@ -1427,15 +1654,19 @@ HTML;
             return $output;
         }
 
+        if (!$this->authenticatorUserVerificationAllowed($credData)) {
+            return $output;
+        }
+
         if ($credData->id !== $userPassKey['credential_id']) {
             return $output;
         }
 
-        if (empty($credData->response->signature) || empty($credData->response->userHandle) || empty($signedData)) {
+        if (empty($credData->response->signature) || empty($credData->response->userHandle)) {
             return $output;
         }
 
-        $userHandle = $sanitizer->int($this->base64url_decode($credData->response->userHandle));
+        $userHandle = $this->decodeUserHandleToInt($credData->response->userHandle);
         $credentialUserId = $sanitizer->int($userPassKey['user_id']);
         if ($credentialUserId < 1 || $credentialUserId !== $userHandle) {
             return $output;
@@ -1451,22 +1682,145 @@ HTML;
             $publicKey = $this->publicKeyToPem($publicKey);
         }
 
-        $signedData = $this->base64url_decode($signedData);
-        $signature = $this->base64url_decode($credData->response->signature);
-        $key = openssl_pkey_get_public($publicKey);
-
-        if (!$key) {
-            return $output;
-        }
-
-        $isValid = openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
+        $isValid = $this->verifyAssertionSignature($credData, $publicKey);
         if ($isValid === 1) {
+            $newSignCount = $this->getAuthenticatorSignCount($credData);
+            if (!$this->credentialCounterValid($userPassKey, $newSignCount)) {
+                return $output;
+            }
+
+            $this->updateCredentialSignCount($userPassKey, $newSignCount);
             $output->msg = $this->getErrorMessage(101);
             $output->errno = 101;
             $output->user = $feUser;
         }
 
         return $output;
+    }
+
+    protected function verifyAssertionSignature($credData, string $publicKey): int
+    {
+        if (empty($credData->response->authenticatorData) || empty($credData->response->clientDataJSON) || empty($credData->response->signature)) {
+            return 0;
+        }
+
+        $authenticatorData = $this->base64url_decode($credData->response->authenticatorData);
+        $clientDataJSON = $this->base64url_decode($credData->response->clientDataJSON);
+        $signature = $this->base64url_decode($credData->response->signature);
+        if ($authenticatorData === false || $clientDataJSON === false || $signature === false) {
+            return 0;
+        }
+
+        $signedData = $authenticatorData . hash('sha256', $clientDataJSON, true);
+        $key = openssl_pkey_get_public($publicKey);
+        if (!$key) {
+            return 0;
+        }
+
+        return openssl_verify($signedData, $signature, $key, OPENSSL_ALGO_SHA256);
+    }
+
+    protected function authenticatorUserVerificationAllowed($credData): bool
+    {
+        if ($this->userVerification !== 'required') {
+            return true;
+        }
+
+        if (empty($credData->response->authenticatorData)) {
+            return false;
+        }
+
+        $authenticatorData = $this->base64url_decode($credData->response->authenticatorData);
+        if ($authenticatorData === false || \strlen($authenticatorData) < 33) {
+            return false;
+        }
+
+        $flags = \ord($authenticatorData[32]);
+        return ($flags & 0x04) === 0x04;
+    }
+
+    protected function getAuthenticatorSignCount($credData): int
+    {
+        if (empty($credData->response->authenticatorData)) {
+            return 0;
+        }
+
+        $authenticatorData = $this->base64url_decode($credData->response->authenticatorData);
+        if ($authenticatorData === false || \strlen($authenticatorData) < 37) {
+            return 0;
+        }
+
+        $unpacked = \unpack('Nsign_count', \substr($authenticatorData, 33, 4));
+        return (int) ($unpacked['sign_count'] ?? 0);
+    }
+
+    protected function credentialCounterValid(array $credential, int $newSignCount): bool
+    {
+        $storedSignCount = (int) ($credential['sign_count'] ?? 0);
+        if ($storedSignCount === 0 && $newSignCount === 0) {
+            return true;
+        }
+
+        if ($newSignCount <= $storedSignCount) {
+            $this->wire('log')->save($this->className(), sprintf(
+                'Signature counter rollback rejected for credential id %d: stored=%d, received=%d',
+                (int) ($credential['id'] ?? 0),
+                $storedSignCount,
+                $newSignCount
+            ));
+            return false;
+        }
+
+        return true;
+    }
+
+    protected function updateCredentialSignCount(array $credential, int $newSignCount): void
+    {
+        $credentialId = (string) ($credential['credential_id'] ?? '');
+        if ($credentialId === '') return;
+
+        $db = $this->wire('database');
+        $sql = "UPDATE " . $this->getTableName() . " SET sign_count=:sign_count WHERE credential_id=:credential_id";
+        $query = $db->prepare($sql);
+        $query->bindValue(':sign_count', $newSignCount, \PDO::PARAM_INT);
+        $query->bindValue(':credential_id', $credentialId);
+        $query->closeCursor();
+        $query->execute();
+    }
+
+    protected function decodeUserHandleToInt(string $userHandle): int
+    {
+        $decoded = $this->base64url_decode($userHandle);
+        if ($decoded === false || $decoded === '') return 0;
+        return ctype_digit($decoded) ? (int) $decoded : 0;
+    }
+
+    protected function clientDataOriginAllowed($clientData, string $rpId): bool
+    {
+        if (!isset($clientData->origin) || !is_string($clientData->origin)) return false;
+        if (isset($clientData->crossOrigin) && $clientData->crossOrigin === true) return false;
+
+        $origin = $clientData->origin;
+        if (strpos($origin, '@') !== false || strpos($origin, '[') !== false) return false;
+
+        $parts = parse_url($origin);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) return false;
+
+        $scheme = strtolower($parts['scheme']);
+        $host = strtolower($parts['host']);
+        $rpId = strtolower($rpId);
+
+        if ($host !== '' && $host[strlen($host) - 1] === '.') {
+            $host = substr($host, 0, -1);
+        }
+
+        if ($scheme !== 'https' && !($scheme === 'http' && ($host === 'localhost' || $host === '127.0.0.1'))) {
+            return false;
+        }
+
+        if ($host === $rpId) return true;
+        $suffix = '.' . $rpId;
+        return strlen($host) > strlen($suffix) && substr($host, -strlen($suffix)) === $suffix;
     }
 
     public function getlpkargs()
@@ -1647,6 +2001,7 @@ HTML;
     public function ___upgrade($fromVersion, $toVersion)
     {
         $this->ensureApiTemplateUrlSegments();
+        $this->ensureSignCountColumn();
     }
 
     protected function ensureApiTemplateUrlSegments(): void
@@ -1659,6 +2014,21 @@ HTML;
             $template->urlSegments = 1;
             $templates->save($template);
         }
+    }
+
+    protected function ensureSignCountColumn(): void
+    {
+        $db = $this->wire('database');
+        $table = $this->getTableName();
+        $query = $db->prepare("SHOW COLUMNS FROM `$table` LIKE 'sign_count'");
+        $query->closeCursor();
+        $query->execute();
+
+        if ($query->fetch(\PDO::FETCH_ASSOC)) {
+            return;
+        }
+
+        $db->exec("ALTER TABLE `$table` ADD `sign_count` INT(10) UNSIGNED NOT NULL DEFAULT 0 AFTER `public_key`");
     }
 
     public function ___uninstall()
@@ -1678,7 +2048,7 @@ HTML;
         }
 
         $tplFileExists = $files->exists($this->config->paths->templates . 'lpk-api.php');
-        if(!$tplFileExists) {
+        if($tplFileExists) {
             $files->unlink($this->config->paths->templates . 'lpk-api.php');
         }
 
@@ -1694,6 +2064,7 @@ HTML;
             "user_id INT(10) UNSIGNED NOT NULL, " .
             "credential_id TEXT NOT NULL, " .
             "public_key TEXT NOT NULL, " .
+            "sign_count INT(10) UNSIGNED NOT NULL DEFAULT 0, " .
             "created TIMESTAMP NOT NULL default CURRENT_TIMESTAMP, " .
             "PRIMARY KEY (id), " .
             "INDEX user_id_index (user_id) " .

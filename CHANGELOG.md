@@ -2,6 +2,26 @@
 
 All notable changes to LoginPassKey will be documented in this file.
 
+## Unreleased
+
+## 0.3.0
+
+- Hardened passkey assertion verification by reconstructing `authenticatorData || SHA-256(clientDataJSON)` server-side instead of accepting client-supplied signed data.
+- Removed browser-side `signedData` generation from login verification requests.
+- Added stricter assertion origin checks, including `crossOrigin` rejection and parsed host validation.
+- Added registration attestation verification with `lbuchs/webauthn`; LoginPassKey now stores the verified PEM public key returned by the WebAuthn library.
+- Registration challenges are now tracked as a short-lived pending list per session, avoiding challenge overwrites when multiple registration UIs are present.
+- Registration banners now skip POST renders so AppApi/404-backed API requests do not mint a fresh challenge while an API step is in progress.
+- Documented the bundled `lbuchs/webauthn` dependency support boundary for ProcessWire GitHub installs.
+- Added `sign_count` storage and assertion counter rollback detection, with zero-counter authenticators allowed while they continue reporting zero.
+- Changed default user verification policy to `required`, exposed it in module config, and enforce the WebAuthn UV flag on login when required.
+- Enforced `POST` for centralized API steps and added CSRF validation to logged-in passkey registration requests.
+- Fixed username/email + passkey login so browser `allowCredentials` restrictions are preserved and credential IDs are converted to `ArrayBuffer` before `navigator.credentials.get()`.
+- Updated the ProcessLoginPassKey admin list to use server-side pagination/search and avoid per-row user lookups.
+- Fixed uninstall cleanup so the installed `site/templates/lpk-api.php` copy is removed only when it exists.
+- Fixed ProcessLoginPassKey package metadata dependency syntax.
+- Hardened database error handling in passkey lookup/list helpers so callers receive expected empty result values and errors are logged.
+
 ## 0.2.0
 
 - Replaced automatic post-login passkey registration with an explicit registration banner for eligible users without a passkey.

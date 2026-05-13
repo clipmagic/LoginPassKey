@@ -150,6 +150,8 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
 
     // Offer passkey registration to an eligible logged-in front end user.
     $wire->addHookAfter('Page::render', function ($event) {
+        if ($this->wire('input')->requestMethod('POST')) return;
+
         $session = $this->wire('session');
         if(!empty($session->getFor('lpk', 'success'))) return;
 
@@ -165,6 +167,7 @@ if($modules->isInstalled('LoginRegisterPro') && $modules->isInstalled('LoginPass
 
             $data = new \stdClass();
             $data->pk = $lpk->preRegisterUser($user);
+            $data->csrf = $lpk->getRegisterCsrfToken();
             $data->next = 'register';
 
             $fwd->data = $data;
