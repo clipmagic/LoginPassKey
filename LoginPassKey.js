@@ -327,6 +327,8 @@ let lpk = {
             fn: 'discover-start',
             next: 'discover-verify'
         }, startUrl).then(async (res) => {
+            if (res && res.end) return res
+
             if (!res || !res.data || !res.data.verifyArgs) {
                 return {
                     end: true,

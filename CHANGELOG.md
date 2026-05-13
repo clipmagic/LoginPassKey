@@ -4,6 +4,12 @@ All notable changes to LoginPassKey will be documented in this file.
 
 ## Unreleased
 
+## 0.3.1
+
+- Added a light session-based rate limit for failed passkey login attempts across username/email + passkey and passkey-only flows.
+- Added cleanup of stored passkey credential rows when a ProcessWire user is deleted.
+- Added 64 KB JSON request body caps and JSON response headers to bundled API endpoints/examples.
+
 ## 0.3.0
 
 - Hardened passkey assertion verification by reconstructing `authenticatorData || SHA-256(clientDataJSON)` server-side instead of accepting client-supplied signed data.

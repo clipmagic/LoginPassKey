@@ -33,6 +33,10 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     public $crossPlatformAttachment = null;
 
+    public $loginAttemptLimit = 10;
+
+    public $loginAttemptWindow = 300;
+
     protected const REGISTER_CSRF_ID = 'loginpasskey-register';
 
     public function getModuleConfigInputfields(array $data)
@@ -127,6 +131,26 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $field->addOption('preferred', $this->_('Preferred'));
         $field->addOption('discouraged', $this->_('Discouraged'));
         $field->value = !empty($data['userVerification']) ? $sanitizer->option($data['userVerification'], ['required', 'preferred', 'discouraged']) : $this->userVerification;
+        $fieldset->add($field);
+
+        // Login attempt limit
+        $field = $modules->get('InputfieldInteger');
+        $field->name = 'loginAttemptLimit';
+        $field->label = $this->_("Passkey login attempt limit");
+        $field->columnWidth	= 50;
+        $field->min = 0;
+        $field->notes = $this->_("Failed passkey login attempts allowed per browser session within the configured window. Set to 0 to disable.");
+        $field->value = isset($data['loginAttemptLimit']) ? (int) $data['loginAttemptLimit'] : $this->loginAttemptLimit;
+        $fieldset->add($field);
+
+        // Login attempt window
+        $field = $modules->get('InputfieldInteger');
+        $field->name = 'loginAttemptWindow';
+        $field->label = $this->_("Passkey login attempt window");
+        $field->columnWidth	= 50;
+        $field->min = 60;
+        $field->notes = $this->_("Time window in seconds for the passkey login attempt limit.");
+        $field->value = isset($data['loginAttemptWindow']) ? (int) $data['loginAttemptWindow'] : $this->loginAttemptWindow;
         $fieldset->add($field);
 
         $fields->add($fieldset);
@@ -282,6 +306,7 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
         $this->addHook('Page::lpkGetErrorMessage', $this, 'lpkGetErrorMessage');
         $this->addHookBefore('ProcessProfile::execute', $this, 'processProfilePasskeyActions');
         $this->addHookAfter('ProcessProfile::execute', $this, 'addProfilePasskeyManagement');
+        $this->addHookAfter('Pages::deleted', $this, 'deletePasskeysForDeletedUser');
     }
 
     public function ___ready() : void
@@ -356,6 +381,21 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
     {
         $user = $event->arguments(0);
         $event->return = $this->canSelfManagePasskeys($user instanceof User ? $user : null);
+    }
+
+    public function deletePasskeysForDeletedUser(HookEvent $event): void
+    {
+        $page = $event->arguments(0);
+        if (!$page instanceof User || $page->isGuest()) return;
+
+        $count = $this->deleteAllUserPasskeys($page);
+        if ($count > 0) {
+            $this->wire('log')->save($this->className(), sprintf(
+                'Deleted %d passkey credential(s) for deleted user id %d',
+                $count,
+                (int) $page->id
+            ));
+        }
     }
 
     public function lpkVerify(HookEvent $event)
@@ -698,6 +738,10 @@ HTML;
 
         switch ($step) {
             case 'finduser':
+                if ($this->passkeyLoginRateLimitExceeded()) {
+                    return $this->apiError($this->getErrorMessage(75), 75);
+                }
+
                 $username = $data->un ?? '';
                 $foundUser = $this->findUser($username);
                 $session->setFor('lpk', 'username', $username);
@@ -726,6 +770,7 @@ HTML;
                         }
                     }
                 } else {
+                    $this->recordPasskeyLoginFailure();
                     $lpkData->data->msg = $foundUser->msg;
                     $lpkData->data->next = 'end';
                 }
@@ -754,8 +799,13 @@ HTML;
                 break;
 
             case 'verify':
+                if ($this->passkeyLoginRateLimitExceeded()) {
+                    return $this->apiError($this->getErrorMessage(75), 75);
+                }
+
                 $errno = $data->errno ?? 4;
                 if (($errno && $errno !== 101) || empty($data->aarverify)) {
+                    $this->recordPasskeyLoginFailure();
                     $lpkData->msg = $this->getErrorMessage($errno);
                     $lpkData->errno = $errno;
                     $lpkData->data->next = 'end';
@@ -769,13 +819,20 @@ HTML;
                         $feUser = $this->getUserByField($username);
                         $session->setFor('lpk', 'success', 'success');
                         $session->forceLogin($feUser);
+                        $this->clearPasskeyLoginFailures();
 
                         $this->finishVerifiedLogin($lpkData);
+                    } else {
+                        $this->recordPasskeyLoginFailure();
                     }
                 }
                 break;
 
             case 'discover-start':
+                if ($this->passkeyLoginRateLimitExceeded()) {
+                    return $this->apiError($this->getErrorMessage(75), 75);
+                }
+
                 if ((int) $this->enabledDiscover !== 1) {
                     $lpkData->data->msg = $this->getErrorMessage(61);
                     $lpkData->data->errno = 61;
@@ -787,8 +844,13 @@ HTML;
                 break;
 
             case 'discover-verify':
+                if ($this->passkeyLoginRateLimitExceeded()) {
+                    return $this->apiError($this->getErrorMessage(75), 75);
+                }
+
                 $errno = $data->errno ?? 4;
                 if (($errno && $errno !== 101) || empty($data->aarverify)) {
+                    $this->recordPasskeyLoginFailure();
                     $lpkData->msg = $this->getErrorMessage($errno);
                     $lpkData->errno = $errno;
                     $lpkData->data->next = 'end';
@@ -801,7 +863,10 @@ HTML;
                         $session->setFor('lpk', 'success', 'success');
                         $session->forceLogin($verified->user);
                         unset($lpkData->data->user);
+                        $this->clearPasskeyLoginFailures();
                         $this->finishVerifiedLogin($lpkData);
+                    } else {
+                        $this->recordPasskeyLoginFailure();
                     }
                 }
                 break;
@@ -828,6 +893,75 @@ HTML;
         $output->errno = $errno;
         $output->next = 'end';
         return $output;
+    }
+
+    protected function passkeyLoginRateLimitExceeded(): bool
+    {
+        $limit = $this->getPasskeyLoginAttemptLimit();
+        if ($limit < 1) return false;
+
+        $window = $this->getPasskeyLoginAttemptWindow();
+        $attempts = $this->getPasskeyLoginFailures();
+        if (!$attempts) return false;
+
+        $now = time();
+        if (($now - $attempts['first']) >= $window) {
+            $this->clearPasskeyLoginFailures();
+            return false;
+        }
+
+        return $attempts['count'] >= $limit;
+    }
+
+    protected function recordPasskeyLoginFailure(): void
+    {
+        $limit = $this->getPasskeyLoginAttemptLimit();
+        if ($limit < 1) return;
+
+        $window = $this->getPasskeyLoginAttemptWindow();
+        $attempts = $this->getPasskeyLoginFailures();
+        $now = time();
+
+        if (!$attempts || ($now - $attempts['first']) >= $window) {
+            $attempts = [
+                'first' => $now,
+                'count' => 0,
+            ];
+        }
+
+        $attempts['count']++;
+        $this->wire('session')->setFor('lpk', 'loginFailures', $attempts);
+    }
+
+    protected function clearPasskeyLoginFailures(): void
+    {
+        $this->wire('session')->removeFor('lpk', 'loginFailures');
+    }
+
+    protected function getPasskeyLoginFailures(): ?array
+    {
+        $attempts = $this->wire('session')->getFor('lpk', 'loginFailures');
+        if (!is_array($attempts)) return null;
+
+        $first = isset($attempts['first']) ? (int) $attempts['first'] : 0;
+        $count = isset($attempts['count']) ? (int) $attempts['count'] : 0;
+
+        if ($first < 1 || $count < 1) return null;
+
+        return [
+            'first' => $first,
+            'count' => $count,
+        ];
+    }
+
+    protected function getPasskeyLoginAttemptLimit(): int
+    {
+        return max(0, (int) ($this->loginAttemptLimit ?? 10));
+    }
+
+    protected function getPasskeyLoginAttemptWindow(): int
+    {
+        return max(60, (int) ($this->loginAttemptWindow ?? 300));
     }
 
     protected function finishVerifiedLogin(\stdClass $lpkData): void
@@ -1064,6 +1198,21 @@ HTML;
             $query->execute($params);
             return $query->rowCount();
         } catch (WireException $e) {
+            $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
+            return 0;
+        }
+    }
+
+    public function deleteAllUserPasskeys(User $user): int
+    {
+        try {
+            $db = $this->wire('database');
+            $query = $db->prepare("DELETE FROM " . $this->getTableName() . " WHERE user_id=:user_id");
+            $query->bindValue(':user_id', (int) $user->id, \PDO::PARAM_INT);
+            $query->closeCursor();
+            $query->execute();
+            return $query->rowCount();
+        } catch (\Throwable $e) {
             $this->wire('log')->save($this->className(), "Database Exception: " . $e->getMessage());
             return 0;
         }
@@ -1878,6 +2027,8 @@ HTML;
                 return $this->_("Already logged in with password");
             case 70:
                 return $this->_("User does not have permission to use WebAuthn");
+            case 75:
+                return $this->_("Too many passkey login attempts. Please wait a few minutes and try again.");
             case 80:
                 return $this->_("User has disallowed role");
             case 90:
