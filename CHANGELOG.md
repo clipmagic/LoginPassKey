@@ -4,6 +4,9 @@ All notable changes to LoginPassKey will be documented in this file.
 
 ## Unreleased
 
+- Fixed LoginPassKey database table name resolution on case-sensitive MySQL/MariaDB servers.
+- Added an upgrade migration from the legacy `LoginPassKey` table name to the canonical `loginpasskey` table name.
+
 ## 0.3.1
 
 - Added a light session-based rate limit for failed passkey login attempts across username/email + passkey and passkey-only flows.

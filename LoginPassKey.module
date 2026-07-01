@@ -39,6 +39,12 @@ class LoginPassKey extends WireData implements Module, ConfigurableModule
 
     protected const REGISTER_CSRF_ID = 'loginpasskey-register';
 
+    protected const TABLE_NAME = 'loginpasskey';
+
+    protected const LEGACY_TABLE_NAME = 'LoginPassKey';
+
+    protected bool $tableNameChecked = false;
+
     public function getModuleConfigInputfields(array $data)
     {
         $modules = wire('modules');
@@ -997,8 +1003,12 @@ HTML;
 
     public function getTableName() : string
     {
-       // return wire('sanitizer')->pageName($this->className());
-        return $this->className(['lowercase']);
+        if (!$this->tableNameChecked) {
+            $this->ensureCanonicalTableName();
+            $this->tableNameChecked = true;
+        }
+
+        return self::TABLE_NAME;
     }
 
     public function showUser()
@@ -2151,8 +2161,71 @@ HTML;
 
     public function ___upgrade($fromVersion, $toVersion)
     {
+        $this->ensureCanonicalTableName();
         $this->ensureApiTemplateUrlSegments();
         $this->ensureSignCountColumn();
+    }
+
+    protected function ensureCanonicalTableName(): void
+    {
+        $canonicalTable = self::TABLE_NAME;
+        $legacyTable = self::LEGACY_TABLE_NAME;
+
+        $hasCanonicalTable = $this->tableExistsExact($canonicalTable);
+        $hasLegacyTable = $this->tableExistsExact($legacyTable);
+
+        if ($hasCanonicalTable) {
+            if ($hasLegacyTable) {
+                $message = 'Both LoginPassKey table names exist. Using canonical loginpasskey table; legacy LoginPassKey table was left untouched.';
+                $this->wire('log')->save($this->className(), $message);
+
+                if ($this->wire('user')->isSuperuser()) {
+                    $this->warning($this->_($message));
+                }
+            }
+            return;
+        }
+
+        if (!$hasLegacyTable) {
+            return;
+        }
+
+        $db = $this->wire('database');
+
+        try {
+            $tempTable = $canonicalTable . '_rename_tmp';
+            if ($this->tableExistsExact($tempTable)) {
+                throw new WireException($this->_('Temporary LoginPassKey database rename table already exists.'));
+            }
+
+            $db->exec("RENAME TABLE `$legacyTable` TO `$tempTable`, `$tempTable` TO `$canonicalTable`");
+        } catch (\PDOException $e) {
+            if ($this->tableExistsExact($canonicalTable)) {
+                return;
+            }
+
+            $this->error($e->getMessage());
+            throw new WireException($this->_('Unable to rename legacy LoginPassKey database table to loginpasskey.'));
+        }
+    }
+
+    protected function tableExistsExact(string $tableName): bool
+    {
+        $db = $this->wire('database');
+
+        try {
+            $query = $db->prepare(
+                'SELECT TABLE_NAME FROM information_schema.TABLES ' .
+                'WHERE TABLE_SCHEMA = DATABASE() AND BINARY TABLE_NAME = :table_name LIMIT 1'
+            );
+            $query->bindValue(':table_name', $tableName, \PDO::PARAM_STR);
+            $query->execute();
+
+            return (bool) $query->fetchColumn();
+        } catch (\PDOException $e) {
+            $this->error($e->getMessage());
+            throw new WireException($this->_('Unable to inspect LoginPassKey database table.'));
+        }
     }
 
     protected function ensureApiTemplateUrlSegments(): void
@@ -2171,15 +2244,24 @@ HTML;
     {
         $db = $this->wire('database');
         $table = $this->getTableName();
-        $query = $db->prepare("SHOW COLUMNS FROM `$table` LIKE 'sign_count'");
-        $query->closeCursor();
-        $query->execute();
 
-        if ($query->fetch(\PDO::FETCH_ASSOC)) {
+        if (!$this->tableExistsExact($table)) {
             return;
         }
 
-        $db->exec("ALTER TABLE `$table` ADD `sign_count` INT(10) UNSIGNED NOT NULL DEFAULT 0 AFTER `public_key`");
+        try {
+            $query = $db->prepare("SHOW COLUMNS FROM `$table` LIKE 'sign_count'");
+            $query->execute();
+
+            if ($query->fetch(\PDO::FETCH_ASSOC)) {
+                return;
+            }
+
+            $db->exec("ALTER TABLE `$table` ADD `sign_count` INT(10) UNSIGNED NOT NULL DEFAULT 0 AFTER `public_key`");
+        } catch (\PDOException $e) {
+            $this->error($e->getMessage());
+            throw new WireException($this->_('Unable to ensure LoginPassKey sign_count database column.'));
+        }
     }
 
     public function ___uninstall()
@@ -2228,7 +2310,7 @@ HTML;
     protected function _deleteTable()
     {
         $db = $this->getDatabase();
-        $sql = "DROP TABLE IF EXISTS " . $this->getTableName();
+        $sql = "DROP TABLE IF EXISTS `" . $this->getTableName() . "`";
         $db->exec($sql);
     }
 }
